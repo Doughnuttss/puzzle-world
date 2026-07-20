@@ -1,0 +1,68 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://systems/portal.gd" id="1_portal"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_trigger"]
+size = Vector3(2.2, 2.8, 1.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_frame"]
+size = Vector3(0.25, 2.8, 0.35)
+
+[sub_resource type="BoxMesh" id="BoxMesh_top"]
+size = Vector3(2.55, 0.25, 0.35)
+
+[sub_resource type="BoxMesh" id="BoxMesh_gate"]
+size = Vector3(2.0, 2.5, 0.15)
+
+[sub_resource type="StandardMaterial3D" id="Mat_frame"]
+albedo_color = Color(0.22, 0.35, 0.42, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="Mat_gate"]
+albedo_color = Color(0.35, 0.75, 0.7, 0.55)
+transparency = 1
+roughness = 0.3
+emission_enabled = true
+emission = Color(0.2, 0.55, 0.5, 1)
+emission_energy_multiplier = 1.4
+
+[node name="Portal" type="Area3D"]
+collision_layer = 4
+collision_mask = 2
+monitoring = true
+monitorable = true
+script = ExtResource("1_portal")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+shape = SubResource("BoxShape3D_trigger")
+
+[node name="FrameLeft" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.15, 1.4, 0)
+mesh = SubResource("BoxMesh_frame")
+surface_material_override/0 = SubResource("Mat_frame")
+
+[node name="FrameRight" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.15, 1.4, 0)
+mesh = SubResource("BoxMesh_frame")
+surface_material_override/0 = SubResource("Mat_frame")
+
+[node name="FrameTop" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.85, 0)
+mesh = SubResource("BoxMesh_top")
+surface_material_override/0 = SubResource("Mat_frame")
+
+[node name="Gate" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+mesh = SubResource("BoxMesh_gate")
+surface_material_override/0 = SubResource("Mat_gate")
+
+[node name="Label3D" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.2, 0)
+pixel_size = 0.012
+billboard = 1
+text = "Enter (E)"
+font_size = 48
+outline_size = 8
+horizontal_alignment = 1
+vertical_alignment = 1

@@ -1,0 +1,121 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://systems/god_shrine.gd" id="1_shrine"]
+[ext_resource type="Script" path="res://systems/rising_monument_portal.gd" id="2_portal"]
+[ext_resource type="Script" path="res://systems/stele_interact.gd" id="3_stele"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_base"]
+top_radius = 1.35
+bottom_radius = 1.45
+height = 0.18
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
+radius = 0.75
+height = 3.6
+
+[sub_resource type="SphereMesh" id="SphereMesh_head"]
+radius = 0.55
+height = 1.1
+
+[sub_resource type="BoxMesh" id="BoxMesh_shoulders"]
+size = Vector3(2.2, 0.55, 0.75)
+
+[sub_resource type="BoxMesh" id="BoxMesh_pad"]
+size = Vector3(2.6, 0.05, 2.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape_approach"]
+size = Vector3(2.8, 2.2, 4.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_stele"]
+size = Vector3(1.15, 1.35, 0.3)
+
+[sub_resource type="BoxShape3D" id="BoxShape_stele"]
+size = Vector3(1.25, 1.35, 0.38)
+
+[node name="GodShrine" type="Node3D"]
+script = ExtResource("1_shrine")
+
+[node name="Plinth" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.09, 0)
+mesh = SubResource("CylinderMesh_base")
+
+[node name="Statue" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Statue"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.95, 0)
+mesh = SubResource("CapsuleMesh_body")
+
+[node name="Shoulders" type="MeshInstance3D" parent="Statue"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.35, 0)
+mesh = SubResource("BoxMesh_shoulders")
+
+[node name="Head" type="MeshInstance3D" parent="Statue"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.3, 0)
+mesh = SubResource("SphereMesh_head")
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.5, 0)
+pixel_size = 0.014
+billboard = 1
+text = "God"
+font_size = 48
+outline_size = 10
+horizontal_alignment = 1
+
+[node name="TitleLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.05, 0)
+pixel_size = 0.009
+billboard = 1
+modulate = Color(0.85, 0.85, 0.8, 1)
+text = "Court"
+font_size = 30
+outline_size = 6
+horizontal_alignment = 1
+
+[node name="AuraLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.2, 0)
+light_energy = 0.2
+omni_range = 8.0
+omni_attenuation = 1.2
+
+[node name="Approach" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.4)
+collision_layer = 0
+collision_mask = 2
+monitoring = true
+monitorable = false
+script = ExtResource("2_portal")
+stele_height = 1.35
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Approach"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
+shape = SubResource("BoxShape_approach")
+
+[node name="PadMesh" type="MeshInstance3D" parent="Approach"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.03, 1.15)
+mesh = SubResource("BoxMesh_pad")
+
+[node name="Stele" type="StaticBody3D" parent="Approach"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.31, -1.0)
+collision_layer = 0
+collision_mask = 0
+script = ExtResource("3_stele")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Approach/Stele"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.675, 0)
+mesh = SubResource("BoxMesh_stele")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Approach/Stele"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.675, 0)
+shape = SubResource("BoxShape_stele")
+
+[node name="Label3D" type="Label3D" parent="Approach/Stele"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, 0.2)
+pixel_size = 0.009
+billboard = 1
+visible = false
+text = ""
+font_size = 28
+outline_size = 6
+horizontal_alignment = 1

@@ -1,0 +1,141 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://systems/world_bootstrap.gd" id="1_boot"]
+[ext_resource type="Script" path="res://systems/spawn_point.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://systems/portal.gd" id="3_portal"]
+[ext_resource type="Script" path="res://worlds/courts/placeholder_court.gd" id="4_court"]
+
+[sub_resource type="Environment" id="Environment_court"]
+background_mode = 1
+background_color = Color(0.25, 0.28, 0.32, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.7, 0.75, 0.8, 1)
+ambient_light_energy = 0.55
+tonemap_mode = 2
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+size = Vector3(28, 0.4, 28)
+
+[sub_resource type="BoxShape3D" id="BoxShape_floor"]
+size = Vector3(28, 0.4, 28)
+
+[sub_resource type="BoxMesh" id="BoxMesh_frame"]
+size = Vector3(0.22, 2.6, 0.28)
+
+[sub_resource type="BoxMesh" id="BoxMesh_top"]
+size = Vector3(2.3, 0.22, 0.28)
+
+[sub_resource type="BoxMesh" id="BoxMesh_gate"]
+size = Vector3(1.85, 2.35, 0.12)
+
+[sub_resource type="BoxShape3D" id="BoxShape_trigger"]
+size = Vector3(2.0, 2.5, 1.4)
+
+[sub_resource type="StandardMaterial3D" id="Mat_gate"]
+albedo_color = Color(0.4, 0.75, 0.7, 0.5)
+transparency = 1
+emission_enabled = true
+emission = Color(0.25, 0.6, 0.55, 1)
+emission_energy_multiplier = 1.2
+
+[node name="PlaceholderCourt" type="Node3D"]
+script = ExtResource("4_court")
+
+[node name="WorldBootstrap" type="Node3D" parent="."]
+script = ExtResource("1_boot")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_court")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 0, 12, 0)
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+collision_layer = 1
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("BoxMesh_floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("BoxShape_floor")
+
+[node name="Title" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.4, 0)
+pixel_size = 0.02
+billboard = 1
+text = "Court"
+font_size = 56
+outline_size = 10
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.85, 0)
+pixel_size = 0.012
+billboard = 1
+modulate = Color(0.85, 0.88, 0.9, 1)
+text = "Title"
+font_size = 32
+outline_size = 6
+horizontal_alignment = 1
+
+[node name="Hint" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)
+pixel_size = 0.008
+billboard = 1
+modulate = Color(0.8, 0.82, 0.78, 1)
+text = "Hint"
+font_size = 22
+outline_size = 4
+horizontal_alignment = 1
+
+[node name="Spawn_FromHub" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 6)
+script = ExtResource("2_spawn")
+spawn_id = "from_hub"
+
+[node name="Spawn_Default" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 6)
+script = ExtResource("2_spawn")
+spawn_id = "default"
+
+[node name="PortalToHub" type="Area3D" parent="."]
+transform = Transform3D(-1, 0, 8.74228e-08, 0, 1, 0, -8.74228e-08, 0, -1, 0, 0.2, 9)
+collision_layer = 4
+collision_mask = 2
+script = ExtResource("3_portal")
+destination_scene_id = "hub"
+destination_spawn_id = "default"
+require_unlocked = false
+open_prompt = "Return to Hub"
+auto_enter = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PortalToHub"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, 0)
+shape = SubResource("BoxShape_trigger")
+
+[node name="FrameLeft" type="MeshInstance3D" parent="PortalToHub"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.05, 1.4, 0)
+mesh = SubResource("BoxMesh_frame")
+
+[node name="FrameRight" type="MeshInstance3D" parent="PortalToHub"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.05, 1.4, 0)
+mesh = SubResource("BoxMesh_frame")
+
+[node name="FrameTop" type="MeshInstance3D" parent="PortalToHub"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.75, 0)
+mesh = SubResource("BoxMesh_top")
+
+[node name="Gate" type="MeshInstance3D" parent="PortalToHub"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, 0)
+mesh = SubResource("BoxMesh_gate")
+surface_material_override/0 = SubResource("Mat_gate")
+
+[node name="Label3D" type="Label3D" parent="PortalToHub"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.95, 0)
+pixel_size = 0.01
+billboard = 1
+text = "Return to Hub"
+font_size = 36
+outline_size = 8
+horizontal_alignment = 1

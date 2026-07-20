@@ -1,0 +1,100 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://systems/world_bootstrap.gd" id="1_boot"]
+[ext_resource type="Script" path="res://systems/spawn_point.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://worlds/hub/hub_courtyard.gd" id="3_ring"]
+[ext_resource type="Script" path="res://worlds/hub/hub_architecture.gd" id="4_arch"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.35, 0.55, 0.85, 1)
+sky_horizon_color = Color(0.78, 0.82, 0.88, 1)
+ground_bottom_color = Color(0.35, 0.32, 0.28, 1)
+ground_horizon_color = Color(0.62, 0.58, 0.5, 1)
+sun_angle_max = 30.0
+
+[sub_resource type="Sky" id="Sky_hub"]
+sky_material = SubResource("SkyMat")
+
+[sub_resource type="Environment" id="Environment_hub"]
+background_mode = 2
+sky = SubResource("Sky_hub")
+ambient_light_source = 3
+ambient_light_color = Color(0.85, 0.88, 0.95, 1)
+ambient_light_sky_contribution = 0.7
+ambient_light_energy = 0.55
+tonemap_mode = 2
+ssao_enabled = true
+ssao_radius = 1.2
+ssao_intensity = 1.5
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_floor"]
+top_radius = 21.0
+bottom_radius = 21.0
+height = 0.5
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.72, 0.68, 0.6, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderShape3D" id="CylinderShape_floor"]
+height = 0.5
+radius = 21.0
+
+[node name="Hub" type="Node3D"]
+
+[node name="WorldBootstrap" type="Node3D" parent="."]
+script = ExtResource("1_boot")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_hub")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.793353, -0.475528, 0.379409, 0, 0.62349, 0.781831, -0.608761, -0.620505, 0.494552, 8, 22, 6)
+shadow_enabled = true
+light_energy = 1.35
+light_color = Color(1, 0.97, 0.9, 1)
+shadow_bias = 0.03
+
+[node name="Floor" type="StaticBody3D" parent="."]
+collision_layer = 1
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("CylinderMesh_floor")
+surface_material_override/0 = SubResource("Mat_floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("CylinderShape_floor")
+
+[node name="Architecture" type="Node3D" parent="."]
+script = ExtResource("4_arch")
+column_count = 24
+column_radius = 14.0
+outer_wall_radius = 20.5
+
+[node name="Title" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
+pixel_size = 0.016
+billboard = 1
+text = "Olympus Courtyard"
+font_size = 48
+outline_size = 10
+horizontal_alignment = 1
+
+[node name="Hint" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.15, 0)
+pixel_size = 0.008
+billboard = 1
+modulate = Color(0.9, 0.9, 0.85, 1)
+text = "Walk onto a god's pad · Stone rises from the floor · Press E to enter"
+font_size = 22
+outline_size = 5
+horizontal_alignment = 1
+
+[node name="Spawn_Default" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 2.0)
+script = ExtResource("2_spawn")
+spawn_id = "default"
+
+[node name="PantheonRing" type="Node3D" parent="."]
+script = ExtResource("3_ring")
+ring_radius = 11.5
