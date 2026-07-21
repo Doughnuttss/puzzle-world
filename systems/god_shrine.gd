@@ -3,7 +3,7 @@ class_name GodShrine
 
 ## Olympian statue with a pressure-plate approach that raises a stele to enter.
 
-@export var court_id: String = "hephaestus"
+@export var court_id: String = "hestia"
 
 @onready var _approach: Area3D = $Approach
 @onready var _name_label: Label3D = $NameLabel
@@ -14,15 +14,28 @@ class_name GodShrine
 @onready var _shoulders_mesh: MeshInstance3D = $Statue/Shoulders
 @onready var _plinth_mesh: MeshInstance3D = $Plinth
 
+var _configured: bool = false
+
 
 func _ready() -> void:
-	_apply_meta()
-	_configure_portal()
-	_refresh_aura()
+	if not _configured:
+		refresh_from_court_id()
 	if not GameState.zone_unlocked.is_connected(_on_progress):
 		GameState.zone_unlocked.connect(_on_progress)
 	if not GameState.zone_completed.is_connected(_on_progress):
 		GameState.zone_completed.connect(_on_progress)
+
+
+func setup(p_court_id: String) -> void:
+	court_id = p_court_id
+	refresh_from_court_id()
+
+
+func refresh_from_court_id() -> void:
+	_configured = true
+	_apply_meta()
+	_configure_portal()
+	_refresh_aura()
 
 
 func _on_progress(_zone_id: String = "") -> void:
@@ -53,11 +66,13 @@ func _apply_meta() -> void:
 	_plinth_mesh.material_override = plinth_mat
 
 	_aura.light_color = color
-	if _approach.has_method("apply_god_color"):
+	if _approach and _approach.has_method("apply_god_color"):
 		_approach.call("apply_god_color", color)
 
 
 func _configure_portal() -> void:
+	if _approach == null:
+		return
 	var meta: Dictionary = GameState.get_court_meta(court_id)
 	var god_name := str(meta.get("name", court_id))
 	_approach.set("destination_scene_id", court_id)
@@ -65,6 +80,7 @@ func _configure_portal() -> void:
 	_approach.set("require_unlocked", true)
 	_approach.set("open_prompt", "Press E — Enter %s" % god_name)
 	_approach.set("locked_prompt", "%s — Sealed" % god_name)
+	_approach.set("cleared_prompt", "Cleared — Press E to re-enter %s" % god_name)
 	if _approach.has_method("apply_god_color"):
 		_approach.call("apply_god_color", meta.get("color", Color.WHITE))
 	if _approach.has_method("refresh_visuals"):

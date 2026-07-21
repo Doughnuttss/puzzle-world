@@ -6,8 +6,14 @@ const PLAYER_SCENE := preload("res://player/player.tscn")
 
 
 func _ready() -> void:
-	# Defer so sibling SpawnPoints have entered the tree/groups.
-	call_deferred("_spawn_player")
+	# Wait for procedural courts (e.g. Hestia builder) to finish collision.
+	call_deferred("_spawn_player_when_ready")
+
+
+func _spawn_player_when_ready() -> void:
+	await get_tree().process_frame
+	await get_tree().physics_frame
+	_spawn_player()
 
 
 func _spawn_player() -> void:

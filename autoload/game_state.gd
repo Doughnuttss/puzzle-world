@@ -7,42 +7,104 @@ signal zone_completed(zone_id: String)
 signal keys_changed
 
 const SAVE_PATH := "user://save.json"
+const SAVE_VERSION := 2
 
 const ZONE_HUB := "hub"
 
-## Play order (scaffolded learning curve).
+## Play order — Tier 1 teach → Tier 4 finale (see COURT_META for themes).
 const COURT_ORDER: Array[String] = [
-	"hephaestus",
-	"demeter",
-	"apollo",
-	"poseidon",
-	"aphrodite",
-	"artemis",
-	"hera",
-	"athena",
-	"dionysus",
-	"ares",
-	"hermes",
-	"zeus",
+	"hestia",      # 1  Tier 1 — branching lines (Witness)
+	"hermes",      # 2  Tier 1 — timed lines
+	"ares",        # 3  Tier 1 — parallel mirror movement
+	"demeter",     # 4  Tier 2 — environmental routing (refreshment)
+	"artemis",     # 5  Tier 2 — mirror + line-of-sight
+	"hephaestus",  # 6  Tier 2 — mirrored line panels (grand integration)
+	"apollo",      # 7  Tier 3 — color filter & partition
+	"aphrodite",   # 8  Tier 3 — symmetrical mirror (refreshment)
+	"athena",      # 9  Tier 3 — sequential / chess pathing
+	"poseidon",    # 10 Tier 4 — vertical mirror & drift
+	"hera",        # 11 Tier 4 — dual phantom multi-axis
+	"zeus",        # 12 Tier 4 — final exam (5 mega-puzzles)
 ]
 
+## name / title = hub labels; theme = environment note; tier + verb = design reference.
 const COURT_META := {
-	"hephaestus": {"name": "Hephaestus", "title": "The Ash Forge", "color": Color(0.85, 0.45, 0.2)},
-	"demeter": {"name": "Demeter", "title": "The Grain Terrace", "color": Color(0.75, 0.7, 0.25)},
-	"apollo": {"name": "Apollo", "title": "The Sun Colonnade", "color": Color(1.0, 0.92, 0.45)},
-	"poseidon": {"name": "Poseidon", "title": "The Quaking Harbor", "color": Color(0.25, 0.55, 0.75)},
-	"aphrodite": {"name": "Aphrodite", "title": "The Mirror Garden", "color": Color(0.95, 0.55, 0.7)},
-	"artemis": {"name": "Artemis", "title": "The Moonlit Hunt", "color": Color(0.7, 0.8, 0.9)},
-	"hera": {"name": "Hera", "title": "The Vow Hall", "color": Color(0.65, 0.45, 0.85)},
-	"athena": {"name": "Athena", "title": "The Olive Oracle", "color": Color(0.45, 0.65, 0.4)},
-	"dionysus": {"name": "Dionysus", "title": "The Revel Theater", "color": Color(0.7, 0.25, 0.45)},
-	"ares": {"name": "Ares", "title": "The Clash Yard", "color": Color(0.75, 0.2, 0.15)},
-	"hermes": {"name": "Hermes", "title": "The Crossroads", "color": Color(0.7, 0.55, 0.3)},
-	"zeus": {"name": "Zeus", "title": "The Thunder Throne", "color": Color(0.85, 0.9, 1.0)},
+	"hestia": {
+		"name": "Hestia", "title": "The Hearth Megaron", "tier": 1, "puzzles": 7,
+		"verb": "Branching lines",
+		"theme": "Classical Greek megaron — terracotta, wooden beams, cold sunken hearth; fire spreads through copper floor conduits to bronze wall torches.",
+		"color": Color(0.9, 0.45, 0.2),
+	},
+	"hermes": {
+		"name": "Hermes", "title": "The Cloud Bridge", "tier": 1, "puzzles": 8,
+		"verb": "Timed lines",
+		"theme": "Open-air marble bridge above endless clouds — white Pentelic stone, gold wings, long morning shadows.",
+		"color": Color(0.7, 0.55, 0.3),
+	},
+	"ares": {
+		"name": "Ares", "title": "The Obsidian Phalanx", "tier": 1, "puzzles": 8,
+		"verb": "Parallel mirror movement",
+		"theme": "Brutalist obsidian fortress courtyard — blood-red mirror trench, bleeding sunset, crimson phantom phalanx.",
+		"color": Color(0.75, 0.2, 0.15),
+	},
+	"demeter": {
+		"name": "Demeter", "title": "The Living Garden", "tier": 2, "puzzles": 9,
+		"verb": "Environmental routing",
+		"theme": "Overgrown multi-tier botanical sanctuary — vine-wrapped ruins, irrigation trenches, dappled sunlight (refreshment court).",
+		"color": Color(0.75, 0.7, 0.25),
+	},
+	"artemis": {
+		"name": "Artemis", "title": "The Moonlit Hunt", "tier": 2, "puzzles": 9,
+		"verb": "Mirror + line-of-sight",
+		"theme": "Dense midnight pine forest — glowing blue moss, oversized silver moon, wolf vision cones.",
+		"color": Color(0.7, 0.8, 0.9),
+	},
+	"hephaestus": {
+		"name": "Hephaestus", "title": "The Volcanic Forge", "tier": 2, "puzzles": 10,
+		"verb": "Mirrored line controls",
+		"theme": "Subterranean industrial foundry — magma rivers, iron grates, bronze gears, automaton assembly (grand integration).",
+		"color": Color(0.85, 0.45, 0.2),
+	},
+	"apollo": {
+		"name": "Apollo", "title": "The Sun Amphitheater", "tier": 3, "puzzles": 9,
+		"verb": "Color filter & partition",
+		"theme": "Sun-drenched white marble amphitheater — crystal tripods, ceiling prisms, rainbow refractions.",
+		"color": Color(1.0, 0.92, 0.45),
+	},
+	"aphrodite": {
+		"name": "Aphrodite", "title": "The Mirror Garden", "tier": 3, "puzzles": 9,
+		"verb": "Symmetrical mirror",
+		"theme": "Decadent palace garden — pink quartz arches, roses, silver-rimmed mirrors, golden hour (refreshment court).",
+		"color": Color(0.95, 0.55, 0.7),
+	},
+	"athena": {
+		"name": "Athena", "title": "The Stone Library", "tier": 3, "puzzles": 10,
+		"verb": "Sequential / chess pathing",
+		"theme": "Towering ancient library — scroll shelves, dark granite chessboards, pale light beams.",
+		"color": Color(0.45, 0.65, 0.4),
+	},
+	"poseidon": {
+		"name": "Poseidon", "title": "The Sunken Temple", "tier": 4, "puzzles": 10,
+		"verb": "Vertical mirror & drift",
+		"theme": "Sunken temple in a pressurized air dome — whales outside, aquamarine light, overhead water tank mirror.",
+		"color": Color(0.25, 0.55, 0.75),
+	},
+	"hera": {
+		"name": "Hera", "title": "The Peacock Throne", "tier": 4, "puzzles": 10,
+		"verb": "Dual phantom multi-axis",
+		"theme": "Imperial throne room — deep purple, gold trim, peacock glass floors, stained-glass light (high integration).",
+		"color": Color(0.65, 0.45, 0.85),
+	},
+	"zeus": {
+		"name": "Zeus", "title": "The Storm Arena", "tier": 4, "puzzles": 5,
+		"verb": "All mechanics — final exam",
+		"theme": "Open-air arena atop storm clouds — golden conductor pillars, lightning arcs, eagle perch over the abyss.",
+		"color": Color(0.85, 0.9, 1.0),
+	},
 }
 
 ## First court only at new game.
-var unlocked_zones: Array[String] = ["hephaestus"]
+var unlocked_zones: Array[String] = ["hestia"]
 var completed_zones: Array[String] = []
 var keys: Array[String] = []
 var spawn_point_id: String = "default"
@@ -98,6 +160,7 @@ func set_spawn_point(point_id: String) -> void:
 
 func save_game() -> void:
 	var data := {
+		"save_version": SAVE_VERSION,
 		"unlocked_zones": unlocked_zones,
 		"completed_zones": completed_zones,
 		"keys": keys,
@@ -120,14 +183,27 @@ func load_game() -> void:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return
 	var data: Dictionary = parsed
-	unlocked_zones.assign(data.get("unlocked_zones", ["hephaestus"]))
+	var version := int(data.get("save_version", 1))
+	if version < SAVE_VERSION:
+		_migrate_save(data)
+		return
+	unlocked_zones.assign(data.get("unlocked_zones", ["hestia"]))
 	completed_zones.assign(data.get("completed_zones", []))
 	keys.assign(data.get("keys", []))
 	spawn_point_id = str(data.get("spawn_point_id", "default"))
 
 
+func _migrate_save(_old_data: Dictionary) -> void:
+	# Court order changed (v2): reset progress; Hestia is now the first court.
+	unlocked_zones = ["hestia"]
+	completed_zones = []
+	keys = []
+	spawn_point_id = "default"
+	save_game()
+
+
 func reset_progress() -> void:
-	unlocked_zones = ["hephaestus"]
+	unlocked_zones = ["hestia"]
 	completed_zones = []
 	keys = []
 	spawn_point_id = "default"

@@ -3,7 +3,7 @@ extends Area3D
 ## Floor pad: stepping here raises a rectangular stele from flush-with-ground to upright.
 ## Press E while on the pad (or looking at the stele) to teleport.
 
-@export var destination_scene_id: String = "hephaestus"
+@export var destination_scene_id: String = "hestia"
 @export var destination_spawn_id: String = "from_hub"
 @export var require_unlocked: bool = true
 @export var open_prompt: String = "Press E — Enter"

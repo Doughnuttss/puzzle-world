@@ -3,7 +3,7 @@ class_name Portal
 
 ## Walk-in portal that routes to another scene via SceneRouter.
 
-@export var destination_scene_id: String = "hephaestus"
+@export var destination_scene_id: String = "hestia"
 @export var destination_spawn_id: String = "from_hub"
 @export var require_unlocked: bool = true
 @export var locked_prompt: String = "Locked"
