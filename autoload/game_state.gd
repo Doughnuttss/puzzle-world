@@ -7,7 +7,7 @@ signal zone_completed(zone_id: String)
 signal keys_changed
 
 const SAVE_PATH := "user://save.json"
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 
 const ZONE_HUB := "hub"
 
@@ -30,7 +30,7 @@ const COURT_ORDER: Array[String] = [
 ## name / title = hub labels; theme = environment note; tier + verb = design reference.
 const COURT_META := {
 	"hestia": {
-		"name": "Hestia", "title": "The Hearth Megaron", "tier": 1, "puzzles": 7,
+		"name": "Hestia", "title": "The Hearth Megaron", "tier": 1, "puzzles": 9,
 		"verb": "Branching lines",
 		"theme": "Classical Greek megaron — terracotta, wooden beams, cold sunken hearth; fire spreads through copper floor conduits to bronze wall torches.",
 		"color": Color(0.9, 0.45, 0.2),
@@ -107,11 +107,15 @@ const COURT_META := {
 var unlocked_zones: Array[String] = ["hestia"]
 var completed_zones: Array[String] = []
 var keys: Array[String] = []
+## zone_id -> Array of solved puzzle id strings (e.g. "1.1")
+var solved_puzzles: Dictionary = {}
 var spawn_point_id: String = "default"
 var current_zone_id: String = ZONE_HUB
 
 
 func _ready() -> void:
+	# Keep listening for the dev reset hotkey even while puzzle UI pauses the tree.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	load_game()
 
 
@@ -158,12 +162,33 @@ func set_spawn_point(point_id: String) -> void:
 	spawn_point_id = point_id
 
 
+func is_puzzle_solved(zone_id: String, puzzle_id: String) -> bool:
+	var list: Array = solved_puzzles.get(zone_id, [])
+	return puzzle_id in list
+
+
+func mark_puzzle_solved(zone_id: String, puzzle_id: String) -> void:
+	if not solved_puzzles.has(zone_id):
+		solved_puzzles[zone_id] = []
+	var list: Array = solved_puzzles[zone_id]
+	if puzzle_id in list:
+		return
+	list.append(puzzle_id)
+	solved_puzzles[zone_id] = list
+	save_game()
+
+
+func get_solved_puzzles(zone_id: String) -> Array:
+	return solved_puzzles.get(zone_id, [])
+
+
 func save_game() -> void:
 	var data := {
 		"save_version": SAVE_VERSION,
 		"unlocked_zones": unlocked_zones,
 		"completed_zones": completed_zones,
 		"keys": keys,
+		"solved_puzzles": solved_puzzles,
 		"spawn_point_id": spawn_point_id,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -190,15 +215,27 @@ func load_game() -> void:
 	unlocked_zones.assign(data.get("unlocked_zones", ["hestia"]))
 	completed_zones.assign(data.get("completed_zones", []))
 	keys.assign(data.get("keys", []))
+	solved_puzzles = data.get("solved_puzzles", {})
 	spawn_point_id = str(data.get("spawn_point_id", "default"))
 
 
-func _migrate_save(_old_data: Dictionary) -> void:
-	# Court order changed (v2): reset progress; Hestia is now the first court.
-	unlocked_zones = ["hestia"]
-	completed_zones = []
-	keys = []
-	spawn_point_id = "default"
+func _migrate_save(old_data: Dictionary) -> void:
+	var version := int(old_data.get("save_version", 1))
+	if version < 2:
+		# Court order changed (v2): reset progress; Hestia is first court.
+		unlocked_zones = ["hestia"]
+		completed_zones = []
+		keys = []
+		solved_puzzles = {}
+		spawn_point_id = "default"
+		save_game()
+		return
+	# v2 -> v3: keep progress, add empty puzzle map.
+	unlocked_zones.assign(old_data.get("unlocked_zones", ["hestia"]))
+	completed_zones.assign(old_data.get("completed_zones", []))
+	keys.assign(old_data.get("keys", []))
+	solved_puzzles = old_data.get("solved_puzzles", {})
+	spawn_point_id = str(old_data.get("spawn_point_id", "default"))
 	save_game()
 
 
@@ -206,5 +243,18 @@ func reset_progress() -> void:
 	unlocked_zones = ["hestia"]
 	completed_zones = []
 	keys = []
+	solved_puzzles = {}
 	spawn_point_id = "default"
 	save_game()
+	print("[DEV] Progress reset — only Hestia unlocked.")
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Dev-only: Ctrl+Shift+R wipes save and reloads the current scene.
+	if not OS.is_debug_build():
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_R and event.ctrl_pressed and event.shift_pressed:
+			reset_progress()
+			get_tree().reload_current_scene()
+			get_viewport().set_input_as_handled()

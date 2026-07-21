@@ -1,7 +1,7 @@
 extends Node3D
 
 ## Procedural greybox for Hestia — The Hearth Megaron (concept art layout).
-## Puzzle markers at 1.1–1.6; logic added later.
+## Puzzles 1.1–1.9: Witness-style branching lines on stone panels.
 
 @export var room_width: float = 26.0
 @export var wall_height: float = 7.0
@@ -65,9 +65,9 @@ func _build_court() -> void:
 	_build_sunken_hearth(stone_dark, iron)
 	for i in 3:
 		var angle: float = PILLAR_ARC_ANGLES[i]
-		var pid := "1_%d" % (i + 1)
+		var pid := "1.%d" % (i + 1)
 		_build_pillar(_pillar_point(angle), pid, stone, conduit_cold)
-	_build_eternal_flame_altar(Vector3(0.0, 0.0, ALTAR_Z), "1_6", stone, terracotta, _mat_emissive(Color(1.0, 0.5, 0.15), 1.4))
+	_build_eternal_flame_altar(Vector3(0.0, 0.0, ALTAR_Z), stone, terracotta, _mat_emissive(Color(1.0, 0.5, 0.15), 1.4))
 	_build_conduit_network(conduit_cold)
 	_build_torches_on_supports(stone_dark)
 
@@ -277,9 +277,12 @@ func _build_side_wall_with_arches(side: int, stone: Material, stone_dark: Materi
 
 	for arch_i in SIDE_ARCH_Z.size():
 		var arch_z: float = SIDE_ARCH_Z[arch_i]
+		# Left: 1.4 rear, 1.5 outer | Right: 1.6 rear, 1.7 outer
 		var puzzle_id := ""
-		if arch_i == 0:
-			puzzle_id = "1_4" if side < 0 else "1_5"
+		if side < 0:
+			puzzle_id = "1.4" if arch_i == 0 else "1.5"
+		else:
+			puzzle_id = "1.6" if arch_i == 0 else "1.7"
 		_build_wall_arch(side, arch_z, stone, stone_dark, trim, brick, panel_mat, puzzle_id, "%s_%d" % [side_name, arch_i])
 		_build_arch_supports_for_arch(side, arch_z, stone)
 
@@ -330,19 +333,16 @@ func _build_wall_arch(side: int, arch_z: float, stone: Material, stone_dark: Mat
 	root.collision_layer = 1
 
 	_add_box_to_body(root, "NicheBackWall", Vector3(0.42, ARCH_OPENING_H + 0.35, ARCH_OPENING_W + 0.1), Vector3(back_x, FLOOR_BASE_Y + (ARCH_OPENING_H + 0.35) * 0.5, arch_z), stone_dark)
-	_add_box_to_body(root, "PanelPlaceholder", Vector3(0.18, panel_h, panel_w), Vector3(panel_x, panel_y, arch_z), panel_mat)
 
 	_add_arch_frame_yz(root, arch_face_x, arch_z, ARCH_OPENING_W * 0.5, ARCH_OPENING_H, 0.42, brick, trim, false, side)
 
 	if puzzle_id != "":
-		var label := Label3D.new()
-		label.text = "1.%s" % puzzle_id.replace("_", ".")
-		label.font_size = 30
-		label.pixel_size = 0.008
-		label.position = Vector3(panel_x + float(side) * 0.5, 4.35, arch_z)
-		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		root.add_child(label)
-		_add_puzzle_marker(root, puzzle_id, Vector3(panel_x, panel_y, arch_z))
+		var defs := _defs_for(puzzle_id)
+		var panel := LineTracePanel.new()
+		panel.name = "LinePanel_%s" % puzzle_id
+		panel.position = Vector3(panel_x, panel_y, arch_z)
+		root.add_child(panel)
+		panel.setup(defs, Vector3(0.18, panel_h, panel_w), Vector3(-float(side), 0.0, 0.0), panel_mat)
 
 	_mark(root)
 
@@ -690,28 +690,16 @@ func _build_pillar(pos: Vector3, puzzle_id: String, stone: Material, panel_mat: 
 	cap.position = Vector3(0.0, 3.85, 0.0)
 	root.add_child(cap)
 
-	var panel := MeshInstance3D.new()
-	panel.name = "PanelPlaceholder"
-	var panel_mesh := BoxMesh.new()
-	panel_mesh.size = Vector3(0.95, 0.95, 0.1)
-	panel.mesh = panel_mesh
-	panel.material_override = panel_mat
+	var panel := LineTracePanel.new()
+	panel.name = "LinePanel_%s" % puzzle_id
 	panel.position = Vector3(0.0, 2.0, 0.58)
 	root.add_child(panel)
+	panel.setup(_defs_for(puzzle_id), Vector3(0.95, 0.95, 0.1), Vector3(0.0, 0.0, 1.0), panel_mat)
 
-	var label := Label3D.new()
-	label.text = "1.%s" % puzzle_id.replace("_", ".")
-	label.font_size = 32
-	label.pixel_size = 0.009
-	label.position = Vector3(0.0, 4.35, 0.65)
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	root.add_child(label)
-
-	_add_puzzle_marker(root, puzzle_id, Vector3(0.0, 2.0, 0.6))
 	_mark(root)
 
 
-func _build_eternal_flame_altar(pos: Vector3, puzzle_id: String, stone: Material, trim: Material, flame_mat: Material) -> void:
+func _build_eternal_flame_altar(pos: Vector3, stone: Material, trim: Material, flame_mat: Material) -> void:
 	var root := Node3D.new()
 	root.name = "EternalFlameAltar"
 	root.position = pos
@@ -734,17 +722,19 @@ func _build_eternal_flame_altar(pos: Vector3, puzzle_id: String, stone: Material
 	altar.position = Vector3(0.0, 0.72, 0.3)
 	root.add_child(altar)
 
-	for x in [-0.55, 0.55]:
-		var slate := MeshInstance3D.new()
-		slate.name = "SlatePlaceholder"
-		var slate_mesh := BoxMesh.new()
-		slate_mesh.size = Vector3(0.7, 0.08, 0.9)
-		slate.mesh = slate_mesh
-		slate.material_override = _mat_emissive(Color(0.45, 0.22, 0.08), 0.3)
-		slate.position = Vector3(x, 1.2, 0.3)
+	var altar_ids := ["1.8", "1.9"]
+	var slate_x := [-0.7, 0.7]
+	for i in 2:
+		var slate := LineTracePanel.new()
+		slate.name = "LinePanel_%s" % altar_ids[i]
+		slate.position = Vector3(slate_x[i], 1.35, 0.55)
+		# Stand upright facing the hearth (+Z toward court entrance is - wait: altar at back, hearth at +Z from altar... ALTAR_Z is more negative than hearth, so toward hearth is +Z)
+		slate.rotation.x = deg_to_rad(-18.0)
 		root.add_child(slate)
+		slate.setup(_defs_for(altar_ids[i]), Vector3(0.85, 0.85, 0.12), Vector3(0.0, 0.0, 1.0))
 
 	var flame := MeshInstance3D.new()
+	flame.name = "AltarFlame"
 	var flame_mesh := CylinderMesh.new()
 	flame_mesh.top_radius = 0.22
 	flame_mesh.bottom_radius = 0.08
@@ -755,21 +745,21 @@ func _build_eternal_flame_altar(pos: Vector3, puzzle_id: String, stone: Material
 	root.add_child(flame)
 
 	var light := OmniLight3D.new()
+	light.name = "AltarLight"
 	light.light_color = Color(1.0, 0.5, 0.18)
-	light.light_energy = 2.0
+	light.light_energy = 0.6
 	light.omni_range = 10.0
 	light.position = Vector3(0.0, 2.0, 0.3)
 	root.add_child(light)
 
 	var label := Label3D.new()
-	label.text = "1.6 Eternal Flame"
+	label.text = "1.8–1.9 Eternal Flame"
 	label.font_size = 32
 	label.pixel_size = 0.008
 	label.position = Vector3(0.0, 3.0, 0.3)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	root.add_child(label)
 
-	_add_puzzle_marker(root, puzzle_id, Vector3(0.0, 1.15, 0.85))
 	_mark(root)
 
 
@@ -847,14 +837,31 @@ func _build_torches_on_supports(stone_dark: Material) -> void:
 			fire.mesh = fire_mesh
 			fire.material_override = flame
 			fire.position = pos + Vector3(0.0, 0.48, 0.0)
+			fire.add_to_group("hestia_torch_flame")
 			_mark(fire)
 
 			var light := OmniLight3D.new()
 			light.light_color = Color(1.0, 0.45, 0.15)
-			light.light_energy = 1.4
+			light.light_energy = 0.15
 			light.omni_range = 8.0
 			light.position = pos + Vector3(0.0, 0.5, 0.0)
+			light.add_to_group("hestia_torch_light")
 			_mark(light)
+
+
+func _defs_for(puzzle_id: String) -> LineTraceDefs:
+	for d in HestiaPuzzleData.all_defs():
+		if d.puzzle_id == puzzle_id:
+			return d
+	var fallback := LineTraceDefs.new()
+	fallback.puzzle_id = puzzle_id
+	fallback.title = puzzle_id
+	fallback.grid_w = 3
+	fallback.grid_h = 3
+	fallback.starts = [Vector2i(0, 1)]
+	fallback.exits = [Vector2i(2, 1)]
+	fallback.fuels = [Vector2i(1, 1)]
+	return fallback
 
 
 func _add_puzzle_marker(parent: Node3D, puzzle_id: String, local_pos: Vector3) -> void:

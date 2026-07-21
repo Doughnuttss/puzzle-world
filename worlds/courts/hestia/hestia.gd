@@ -1,6 +1,6 @@
 extends Node3D
 
-## Hestia court scene root — geometry only for now.
+## Hestia court — hearth megaron with branching-line puzzles.
 
 
 func _ready() -> void:

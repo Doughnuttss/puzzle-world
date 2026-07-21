@@ -10,9 +10,11 @@ const INTERACT_DISTANCE := 3.5
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var interact_ray: RayCast3D = $Head/InteractRay
 @onready var prompt_label: Label = $HUD/PromptLabel
+@onready var crosshair: Label = $HUD/Crosshair
 
 var _pitch: float = 0.0
 var _current_target: Node = null
+var _puzzle_mode: bool = false
 
 
 func _ready() -> void:
@@ -27,7 +29,26 @@ func _ready() -> void:
 	prompt_label.visible = false
 
 
+func set_puzzle_mode(active: bool) -> void:
+	_puzzle_mode = active
+	if active:
+		prompt_label.visible = false
+		_current_target = null
+		velocity = Vector3.ZERO
+		if crosshair:
+			crosshair.visible = false
+	elif crosshair:
+		crosshair.visible = true
+
+
+func is_in_puzzle_mode() -> bool:
+	return _puzzle_mode
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _puzzle_mode:
+		return
+
 	if event.is_action_pressed("pause"):
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -49,6 +70,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _puzzle_mode:
+		velocity = Vector3.ZERO
+		return
+
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 
@@ -75,6 +100,8 @@ func _physics_process(delta: float) -> void:
 func _update_interact_prompt() -> void:
 	_current_target = null
 	prompt_label.visible = false
+	if _puzzle_mode:
+		return
 
 	if interact_ray.is_colliding():
 		var target := _find_interactable(interact_ray.get_collider())

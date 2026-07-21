@@ -1,16 +1,15 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene format=3 uid="uid://nusvdblutyis"]
 
-[ext_resource type="Script" path="res://systems/world_bootstrap.gd" id="1_boot"]
-[ext_resource type="Script" path="res://systems/spawn_point.gd" id="2_spawn"]
-[ext_resource type="Script" path="res://worlds/hub/hub_courtyard.gd" id="3_ring"]
-[ext_resource type="Script" path="res://worlds/hub/hub_architecture.gd" id="4_arch"]
+[ext_resource type="Script" uid="uid://ckgg1mbu57qs5" path="res://systems/world_bootstrap.gd" id="1_boot"]
+[ext_resource type="Script" uid="uid://cpirx8262yqb5" path="res://systems/spawn_point.gd" id="2_spawn"]
+[ext_resource type="Script" uid="uid://d02hkn7g4yb66" path="res://worlds/hub/hub_courtyard.gd" id="3_ring"]
+[ext_resource type="Script" uid="uid://bgp2aa8kty4q0" path="res://worlds/hub/hub_architecture.gd" id="4_arch"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.35, 0.55, 0.85, 1)
 sky_horizon_color = Color(0.78, 0.82, 0.88, 1)
 ground_bottom_color = Color(0.35, 0.32, 0.28, 1)
 ground_horizon_color = Color(0.62, 0.58, 0.5, 1)
-sun_angle_max = 30.0
 
 [sub_resource type="Sky" id="Sky_hub"]
 sky_material = SubResource("SkyMat")
@@ -40,47 +39,43 @@ roughness = 0.9
 height = 0.5
 radius = 21.0
 
-[node name="Hub" type="Node3D"]
+[node name="Hub" type="Node3D" unique_id=333928192]
 
-[node name="WorldBootstrap" type="Node3D" parent="."]
+[node name="WorldBootstrap" type="Node3D" parent="." unique_id=1710218345]
 script = ExtResource("1_boot")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1328986548]
 environment = SubResource("Environment_hub")
 
-[node name="Sun" type="DirectionalLight3D" parent="."]
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1724121092]
 transform = Transform3D(0.793353, -0.475528, 0.379409, 0, 0.62349, 0.781831, -0.608761, -0.620505, 0.494552, 8, 22, 6)
-shadow_enabled = true
-light_energy = 1.35
 light_color = Color(1, 0.97, 0.9, 1)
+light_energy = 1.35
+shadow_enabled = true
 shadow_bias = 0.03
 
-[node name="Floor" type="StaticBody3D" parent="."]
-collision_layer = 1
+[node name="Floor" type="StaticBody3D" parent="." unique_id=739316547]
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=1945889825]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.004401505, -0.0059634447, 0.0061169267)
 mesh = SubResource("CylinderMesh_floor")
 surface_material_override/0 = SubResource("Mat_floor")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor" unique_id=868651220]
 shape = SubResource("CylinderShape_floor")
 
-[node name="Architecture" type="Node3D" parent="."]
+[node name="Architecture" type="Node3D" parent="." unique_id=105540096]
 script = ExtResource("4_arch")
-column_count = 24
-column_radius = 14.0
-outer_wall_radius = 20.5
 
-[node name="Title" type="Label3D" parent="."]
+[node name="Title" type="Label3D" parent="." unique_id=1014879534]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 pixel_size = 0.016
 billboard = 1
 text = "Olympus Courtyard"
 font_size = 48
 outline_size = 10
-horizontal_alignment = 1
 
-[node name="Hint" type="Label3D" parent="."]
+[node name="Hint" type="Label3D" parent="." unique_id=1839774306]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.15, 0)
 pixel_size = 0.008
 billboard = 1
@@ -88,13 +83,10 @@ modulate = Color(0.9, 0.9, 0.85, 1)
 text = "Face south — Hestia is the first court · Walk onto a god's pad · Press E"
 font_size = 22
 outline_size = 5
-horizontal_alignment = 1
 
-[node name="Spawn_Default" type="Node3D" parent="."]
+[node name="Spawn_Default" type="Node3D" parent="." unique_id=1577223503]
 transform = Transform3D(-1, 0, 8.74228e-08, 0, 1, 0, -8.74228e-08, 0, -1, 0, 0.55, -2.5)
 script = ExtResource("2_spawn")
-spawn_id = "default"
 
-[node name="PantheonRing" type="Node3D" parent="."]
+[node name="PantheonRing" type="Node3D" parent="." unique_id=1209373417]
 script = ExtResource("3_ring")
-ring_radius = 11.5
