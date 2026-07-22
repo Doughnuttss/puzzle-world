@@ -4,7 +4,7 @@ const SPEED := 5.0
 const SPRINT_MULT := 1.45
 const JUMP_VELOCITY := 4.5
 const MOUSE_SENS := 0.0025
-const INTERACT_DISTANCE := 3.5
+const INTERACT_DISTANCE := 6.5
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -20,11 +20,13 @@ var _puzzle_mode: bool = false
 func _ready() -> void:
 	add_to_group("player")
 	collision_layer = 2
-	collision_mask = 1
+	collision_mask = 1 | 4  # world solids + barrier layer
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	interact_ray.target_position = Vector3(0, 0, -INTERACT_DISTANCE)
 	interact_ray.collide_with_areas = true
 	interact_ray.collide_with_bodies = true
+	# Hit world/interactables (layer 1), not the altar barrier (layer 4).
+	interact_ray.collision_mask = 1
 	interact_ray.enabled = true
 	prompt_label.visible = false
 

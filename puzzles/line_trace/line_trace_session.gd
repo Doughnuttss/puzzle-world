@@ -84,10 +84,16 @@ func open_on_panel(panel: LineTracePanel, player: Node) -> void:
 
 	_status.text = panel.defs.title
 	_status.add_theme_color_override("font_color", Color(1.0, 0.88, 0.6))
-	_hint.text = "Yellow spark = start · Orange = fuel · Cyan square = exit · LMB drag · R reset · Esc"
+	_hint.text = "Yellow = start · Orange coal = sandwich both sides · Cyan = exit · LMB drag · R reset · Esc"
 
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	await _zoom_in()
+	if panel.keep_player_camera:
+		# Stay on the player camera — draw on the distant stone from here.
+		if _player_camera:
+			_player_camera.current = true
+		_hint.text = "Yellow = start · Orange coal = sandwich · Cyan = exit · LMB drag · R reset · Esc"
+	else:
+		await _zoom_in()
 
 
 func close_session(emit_closed: bool = true) -> void:
@@ -101,7 +107,10 @@ func close_session(emit_closed: bool = true) -> void:
 			_panel.board_status_changed.disconnect(_on_status)
 		if _panel.board_solved.is_connected(_on_board_solved):
 			_panel.board_solved.disconnect(_on_board_solved)
-	await _zoom_out()
+	if _panel and not _panel.keep_player_camera:
+		await _zoom_out()
+	elif _puzzle_camera != null:
+		await _zoom_out()
 	visible = false
 	_panel = null
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -181,7 +190,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _forward_pointer(screen_pos: Vector2, pressed: bool, moving: bool) -> void:
 	if _panel == null:
 		return
-	var cam := _puzzle_camera if _puzzle_camera else _player_camera
+	var cam := _player_camera if _panel.keep_player_camera else (_puzzle_camera if _puzzle_camera else _player_camera)
 	if cam == null:
 		return
 	var local := _panel.screen_to_board(cam, screen_pos)

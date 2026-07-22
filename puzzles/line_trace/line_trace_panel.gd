@@ -17,9 +17,12 @@ var defs: LineTraceDefs
 var is_unlocked: bool = true
 var is_solved: bool = false
 var face_normal: Vector3 = Vector3(0, 0, 1)
+var keep_player_camera: bool = false
+var _solved_path: Array[Vector2i] = []
 
 var _mesh: MeshInstance3D
 var _label: Label3D
+var _solid: StaticBody3D
 var _panel_size: Vector3 = Vector3(1, 1, 0.1)
 var _mat_cold: StandardMaterial3D
 var _mat_hot: StandardMaterial3D
@@ -74,11 +77,24 @@ func setup(p_defs: LineTraceDefs, size: Vector3, p_face_normal: Vector3 = Vector
 	_mesh.material_override = _mat_cold
 	add_child(_mesh)
 
+	# Interact volume (Area3D) — slightly larger than the slab.
 	var shape := CollisionShape3D.new()
 	var cs := BoxShape3D.new()
 	cs.size = size * Vector3(1.2, 1.15, 1.35)
 	shape.shape = cs
 	add_child(shape)
+
+	# Solid world collider so the player cannot walk through the stone.
+	_solid = StaticBody3D.new()
+	_solid.name = "PanelSolid"
+	_solid.collision_layer = 1
+	_solid.collision_mask = 0
+	var solid_shape := CollisionShape3D.new()
+	var solid_box := BoxShape3D.new()
+	solid_box.size = size
+	solid_shape.shape = solid_box
+	_solid.add_child(solid_shape)
+	add_child(_solid)
 
 	_logic = LineTraceBoardLogic.new()
 	_logic.configure(defs)
@@ -130,6 +146,31 @@ func _thickness() -> float:
 	return absf(_panel_size.x * n.x + _panel_size.y * n.y + _panel_size.z * n.z)
 
 
+func set_solid_enabled(enabled: bool) -> void:
+	if _solid:
+		_solid.collision_layer = 1 if enabled else 0
+
+
+func enable_remote_play(reach_along_face: float) -> void:
+	## Play from afar: no camera zoom; long interact volume along the face normal.
+	keep_player_camera = true
+	var proxy := Area3D.new()
+	proxy.name = "RemoteInteract"
+	proxy.collision_layer = 1
+	proxy.collision_mask = 0
+	proxy.monitoring = false
+	proxy.monitorable = true
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	var reach := maxf(2.0, reach_along_face)
+	box.size = Vector3(maxf(1.2, _panel_size.x * 1.35), maxf(1.2, _panel_size.y * 1.25), reach)
+	shape.shape = box
+	# Extend from the panel face toward the player approach direction.
+	shape.position = face_normal * (reach * 0.5 + _thickness() * 0.5)
+	proxy.add_child(shape)
+	add_child(proxy)
+
+
 func set_unlocked(value: bool) -> void:
 	is_unlocked = value
 	_refresh_visual()
@@ -138,11 +179,23 @@ func set_unlocked(value: bool) -> void:
 func mark_solved(silent: bool = false) -> void:
 	if is_solved:
 		return
+	if _logic != null and _logic.path.size() >= 2:
+		_solved_path = _logic.path.duplicate()
 	is_solved = true
 	is_unlocked = true
 	_refresh_visual()
 	if not silent:
 		puzzle_solved.emit(puzzle_id)
+
+
+func set_solved_path(path: Array[Vector2i]) -> void:
+	_solved_path = path.duplicate()
+	if is_solved:
+		_rebuild_grid_visual()
+
+
+func get_display_path() -> Array[Vector2i]:
+	return _solved_path.duplicate()
 
 
 func get_prompt() -> String:
@@ -260,7 +313,7 @@ func _rebuild_grid_visual() -> void:
 			var cell := Vector2i(x, y)
 			var center := _cell_center_local(cell)
 			var col := Color(0.38, 0.34, 0.30)
-			if defs.is_blocked(cell):
+			if defs.is_black(cell) or defs.is_blocked(cell):
 				col = Color(0.12, 0.10, 0.09)
 			elif (x + y) % 2 == 0:
 				col = Color(0.44, 0.40, 0.36)
@@ -274,23 +327,40 @@ func _rebuild_grid_visual() -> void:
 		for cell in _logic.path:
 			_add_marker_chip(_cell_center_local(cell), marker_r * 0.45, Color(1.0, 0.55, 0.18), 0.04)
 
-	if not is_solved:
-		for fuel in defs.fuels:
-			var visited := false
-			if _logic != null:
-				for p in _logic.path:
-					if p == fuel:
-						visited = true
-						break
-			var c := Color(0.35, 0.95, 0.45) if visited else Color(1.0, 0.4, 0.08)
-			_add_marker_chip(_cell_center_local(fuel), marker_r * 0.7, c, 0.05)
-
+	if is_solved:
+		# Permanently burn the clearing onto the stone.
+		if _solved_path.size() >= 2:
+			for i in range(_solved_path.size() - 1):
+				var a2 := _cell_center_local(_solved_path[i])
+				var b2 := _cell_center_local(_solved_path[i + 1])
+				_add_path_segment(a2, b2, Color(1.0, 0.42, 0.12))
+			for cell in _solved_path:
+				_add_marker_chip(_cell_center_local(cell), marker_r * 0.4, Color(1.0, 0.5, 0.15), 0.035)
+		var occupied := LineTraceValidator.path_occupied(_solved_path)
+		for piece in defs.black_pieces:
+			var captured := _solved_path.is_empty() or LineTraceValidator.is_captured(piece, occupied, defs)
+			var c := Color(0.35, 0.95, 0.45) if captured else Color(0.55, 0.28, 0.1)
+			_add_marker_chip(_cell_center_local(piece), marker_r * 0.65, c, 0.05)
 		for s in defs.starts:
-			_add_marker_chip(_cell_center_local(s), marker_r * 0.95, Color(1.0, 0.88, 0.25), 0.06)
-			_add_marker_chip(_cell_center_local(s), marker_r * 0.4, Color(0.15, 0.08, 0.02), 0.08)
-
+			_add_marker_chip(_cell_center_local(s), marker_r * 0.85, Color(1.0, 0.78, 0.2), 0.055)
 		for e in defs.exits:
-			_add_exit_marker(_cell_center_local(e), marker_r, Color(0.35, 0.9, 1.0))
+			_add_exit_marker(_cell_center_local(e), marker_r * 0.9, Color(0.45, 0.85, 1.0))
+		return
+
+	var occupied_live: Dictionary = {}
+	if _logic != null:
+		occupied_live = LineTraceValidator.path_occupied(_logic.path)
+	for piece in defs.black_pieces:
+		var captured := LineTraceValidator.is_captured(piece, occupied_live, defs)
+		var c := Color(0.35, 0.95, 0.45) if captured else Color(1.0, 0.4, 0.08)
+		_add_marker_chip(_cell_center_local(piece), marker_r * 0.7, c, 0.05)
+
+	for s in defs.starts:
+		_add_marker_chip(_cell_center_local(s), marker_r * 0.95, Color(1.0, 0.88, 0.25), 0.06)
+		_add_marker_chip(_cell_center_local(s), marker_r * 0.4, Color(0.15, 0.08, 0.02), 0.08)
+
+	for e in defs.exits:
+		_add_exit_marker(_cell_center_local(e), marker_r, Color(0.35, 0.9, 1.0))
 
 
 func _face_aligned_size(along_u: float, along_v: float, along_n: float) -> Vector3:

@@ -49,14 +49,26 @@ func handle_cell(cell: Vector2i, pressed: bool, moving: bool) -> void:
 			_after_extend()
 
 
+func captured_count() -> int:
+	if defs == null:
+		return 0
+	var occupied := LineTraceValidator.path_occupied(path)
+	var n := 0
+	for piece in defs.black_pieces:
+		if LineTraceValidator.is_captured(piece, occupied, defs):
+			n += 1
+	return n
+
+
 func _default_status() -> String:
 	if defs == null:
 		return ""
-	if defs.starts.size() > 1:
-		return "Two sparks — only one feeds every fuel."
-	if defs.exits.size() > 1:
-		return "Two exits — only one clears every fuel."
-	return "Trace from spark to exit. Visit every fuel."
+	var n := defs.black_pieces.size()
+	if n <= 0:
+		return "Trace from spark to exit."
+	if n == 1:
+		return "Flank the coal on both sides, then reach the exit."
+	return "Sandwich every coal, then dock at the exit."
 
 
 func _emit_status(text: String, ok: bool) -> void:
@@ -65,6 +77,10 @@ func _emit_status(text: String, ok: bool) -> void:
 
 func _after_extend() -> void:
 	path_changed.emit()
+	var n := defs.black_pieces.size()
+	var got := captured_count()
+	if got < n:
+		_emit_status("Coals flanked: %d / %d" % [got, n], true)
 	if defs.is_exit(path[path.size() - 1]):
 		var result := LineTraceValidator.validate(defs, path)
 		_emit_status(str(result.reason), bool(result.ok))

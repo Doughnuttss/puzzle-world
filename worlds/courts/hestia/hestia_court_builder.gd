@@ -1,7 +1,7 @@
 extends Node3D
 
 ## Procedural greybox for Hestia — The Hearth Megaron (concept art layout).
-## Puzzles 1.1–1.9: Witness-style branching lines on stone panels.
+## Puzzles 1.1–1.13: sandwich-capture lines on stone panels.
 
 @export var room_width: float = 26.0
 @export var wall_height: float = 7.0
@@ -18,10 +18,12 @@ const ARCH_OPENING_H := 4.2
 const ARCH_RECESS_DEPTH := 1.2
 const WALL_THICKNESS := 0.85
 
-const ALCOVE_DEPTH := 3.4
-const ALCOVE_BACK_HALF_W := 1.45
-const ALCOVE_SLANT_INSET := 1.45
-const ALCOVE_OPENING_HALF_W := 3.5
+const ALCOVE_DEPTH := 7.6
+const ALCOVE_BACK_HALF_W := 6.6
+## Wide mouth + shallow side pinch so diagonals flare open and don't occlude back-wall panels.
+const ALCOVE_OPENING_HALF_W := 10.5
+const ALCOVE_SLANT_X_INSET := 1.1
+const ALCOVE_SLANT_Z_DEPTH := 3.8
 const ARCH_SUPPORT_HALF_W := 0.42
 const ARCH_ELEMENT_GAP := 0.5
 const FLOOR_BASE_Y := FLOOR_TOP_Y
@@ -36,6 +38,10 @@ const ARC_BARRIER_HEIGHT := 1.45
 const MARKER_GROUP := "hestia_puzzle_marker"
 const HEARTH_CENTER := Vector3(0.0, 0.0, ARCH_OUTER_Z)
 const HEARTH_RADIUS := 2.5
+const HEARTH_PLATFORM_SUNK_Y := -0.15
+const HEARTH_PLATFORM_RAISED_Y := 0.82
+const HEARTH_TABLETS_SUNK_Y := -1.15
+const HEARTH_TABLETS_RAISED_Y := 0.42
 const ALTAR_Z := BACK_Z - ALCOVE_DEPTH * 0.55
 
 
@@ -62,7 +68,7 @@ func _build_court() -> void:
 	_build_floor(cobble)
 	_build_interior_walls(stone, stone_dark, terracotta, brick, panel_mat)
 	_build_side_roofs(wood)
-	_build_sunken_hearth(stone_dark, iron)
+	_build_sunken_hearth(stone_dark, iron, panel_mat, conduit_cold)
 	for i in 3:
 		var angle: float = PILLAR_ARC_ANGLES[i]
 		var pid := "1.%d" % (i + 1)
@@ -106,8 +112,10 @@ func _pillar_point(deg: float) -> Vector3:
 
 func _build_floor(mat: Material) -> void:
 	var floor_y := FLOOR_TOP_Y - FLOOR_THICKNESS * 0.5
-	var hall_depth := ARC_CENTER.z - BACK_Z
-	var hall_center_z := BACK_Z + hall_depth * 0.5
+	# Stop short of BACK_Z so the terracotta alcove floor owns the Expert zone (no overlap).
+	var hall_north_z := BACK_Z + 0.08
+	var hall_depth := ARC_CENTER.z - hall_north_z
+	var hall_center_z := hall_north_z + hall_depth * 0.5
 
 	var floor_body := StaticBody3D.new()
 	floor_body.name = "Floor"
@@ -165,10 +173,10 @@ func _build_semicircle_floor(mat: Material, floor_y: float) -> void:
 	_mark(body)
 
 
-func _build_interior_walls(stone: Material, stone_dark: Material, trim: Material, brick: Material, panel_mat: Material) -> void:
-	_build_back_wall_with_alcove(stone, stone_dark, trim, brick)
-	_build_side_wall_with_arches(-1, stone, stone_dark, trim, brick, panel_mat)
-	_build_side_wall_with_arches(1, stone, stone_dark, trim, brick, panel_mat)
+func _build_interior_walls(stone: Material, stone_dark: Material, terracotta: Material, brick: Material, panel_mat: Material) -> void:
+	_build_back_wall_with_alcove(stone, stone_dark, terracotta, brick)
+	_build_side_wall_with_arches(-1, stone, stone_dark, terracotta, brick, panel_mat)
+	_build_side_wall_with_arches(1, stone, stone_dark, terracotta, brick, panel_mat)
 	_build_arc_barrier(stone_dark)
 
 
@@ -180,23 +188,23 @@ func _wall_room_face_x(side: int) -> float:
 	return _wall_inner_x(side) - float(side) * WALL_THICKNESS * 0.5
 
 
-func _build_back_wall_with_alcove(stone: Material, stone_dark: Material, trim: Material, brick: Material) -> void:
+func _build_back_wall_with_alcove(stone: Material, stone_dark: Material, terracotta: Material, brick: Material) -> void:
 	var half_w := room_width * 0.5
 	var wing_w := half_w - ALCOVE_OPENING_HALF_W
 
 	_add_wall("BackWallLeft", Vector3(-half_w + wing_w * 0.5, wall_height * 0.5, BACK_Z), Vector3(wing_w, wall_height, WALL_THICKNESS), stone)
 	_add_wall("BackWallRight", Vector3(half_w - wing_w * 0.5, wall_height * 0.5, BACK_Z), Vector3(wing_w, wall_height, WALL_THICKNESS), stone)
 
-	_build_half_octagon_alcove(stone, stone_dark)
-	_build_back_alcove_arch(brick, trim, -ALCOVE_OPENING_HALF_W, ALCOVE_OPENING_HALF_W, BACK_Z + 0.15)
+	_build_half_octagon_alcove(stone, stone_dark, terracotta)
+	_build_back_alcove_arch(brick, terracotta, -ALCOVE_OPENING_HALF_W, ALCOVE_OPENING_HALF_W, BACK_Z + 0.15)
 
 	for x in [-half_w + wing_w * 0.5, half_w - wing_w * 0.5]:
 		var lintel := MeshInstance3D.new()
 		lintel.name = "BackLintel_%d" % int(x)
 		var lintel_mesh := BoxMesh.new()
-		lintel_mesh.size = Vector3(wing_w - 0.5, 0.5, 0.55)
+		lintel_mesh.size = Vector3(maxf(0.5, wing_w - 0.5), 0.5, 0.55)
 		lintel.mesh = lintel_mesh
-		lintel.material_override = trim
+		lintel.material_override = terracotta
 		lintel.position = Vector3(x, 5.6, BACK_Z + 0.2)
 		_mark(lintel)
 
@@ -206,27 +214,29 @@ func _alcove_back_z() -> float:
 
 
 func _alcove_slant_point(side: int) -> Vector3:
+	## Bend point of the flared diagonal: stays wide so panels on the back wall stay visible.
 	var x_sign := float(side)
 	return Vector3(
-		x_sign * (ALCOVE_OPENING_HALF_W - ALCOVE_SLANT_INSET),
+		x_sign * (ALCOVE_OPENING_HALF_W - ALCOVE_SLANT_X_INSET),
 		0.0,
-		BACK_Z - ALCOVE_SLANT_INSET
+		BACK_Z - ALCOVE_SLANT_Z_DEPTH
 	)
 
 
-func _build_half_octagon_alcove(stone: Material, stone_dark: Material) -> void:
+func _build_half_octagon_alcove(stone: Material, stone_dark: Material, terracotta: Material) -> void:
 	var back_z := _alcove_back_z()
 	var alcove_center_z := BACK_Z - ALCOVE_DEPTH * 0.5
 
+	# Terracotta floor strictly inside the alcove (south edge at BACK_Z) — no hall overlap.
 	var floor_body := StaticBody3D.new()
 	floor_body.name = "AlcoveFloor"
 	floor_body.collision_layer = 1
 	var floor_mesh := MeshInstance3D.new()
 	var floor_box := BoxMesh.new()
-	floor_box.size = Vector3(ALCOVE_OPENING_HALF_W * 2.05, FLOOR_THICKNESS, ALCOVE_DEPTH + 0.35)
+	floor_box.size = Vector3(ALCOVE_OPENING_HALF_W * 2.05, FLOOR_THICKNESS, ALCOVE_DEPTH)
 	floor_mesh.mesh = floor_box
-	floor_mesh.material_override = stone_dark
-	floor_mesh.position = Vector3(0.0, FLOOR_TOP_Y - FLOOR_THICKNESS * 0.5, alcove_center_z)
+	floor_mesh.material_override = terracotta
+	floor_mesh.position = Vector3(0.0, FLOOR_TOP_Y - FLOOR_THICKNESS * 0.5 + 0.002, alcove_center_z)
 	floor_body.add_child(floor_mesh)
 	var floor_shape := CollisionShape3D.new()
 	var floor_cs := BoxShape3D.new()
@@ -243,20 +253,132 @@ func _build_half_octagon_alcove(stone: Material, stone_dark: Material) -> void:
 	var back_l := Vector3(-ALCOVE_BACK_HALF_W, 0.0, back_z)
 	var back_r := Vector3(ALCOVE_BACK_HALF_W, 0.0, back_z)
 
-	_add_oriented_wall("AlcoveSlantLeft", front_l, slant_l, wall_height, 0.8, stone)
-	_add_oriented_wall("AlcoveRearLeft", slant_l, back_l, wall_height, 0.8, stone)
-	_add_wall("AlcoveBackWall", Vector3(0.0, wall_height * 0.5, back_z), Vector3(ALCOVE_BACK_HALF_W * 2.0, wall_height, 0.8), stone)
-	_add_oriented_wall("AlcoveRearRight", back_r, slant_r, wall_height, 0.8, stone)
-	_add_oriented_wall("AlcoveSlantRight", slant_r, front_r, wall_height, 0.8, stone)
+	_add_oriented_wall("AlcoveSlantLeft", front_l, slant_l, wall_height, 0.85, stone)
+	_add_oriented_wall("AlcoveRearLeft", slant_l, back_l, wall_height, 0.85, stone)
+	_add_wall("AlcoveBackWall", Vector3(0.0, wall_height * 0.5, back_z), Vector3(ALCOVE_BACK_HALF_W * 2.0, wall_height, 0.85), stone)
+	_add_oriented_wall("AlcoveRearRight", back_r, slant_r, wall_height, 0.85, stone)
+	_add_oriented_wall("AlcoveSlantRight", slant_r, front_r, wall_height, 0.85, stone)
 
+	_build_altar_guardian_statues(stone, stone_dark)
+
+	# Raised dais under the altar only (panels live on the back wall now).
+	var dais_body := StaticBody3D.new()
+	dais_body.name = "AltarDais"
+	dais_body.collision_layer = 1
 	var dais := MeshInstance3D.new()
-	dais.name = "AltarDais"
 	var dais_mesh := BoxMesh.new()
-	dais_mesh.size = Vector3(2.4, 0.35, 1.8)
+	dais_mesh.size = Vector3(6.5, 0.4, 4.0)
 	dais.mesh = dais_mesh
 	dais.material_override = stone_dark
-	dais.position = Vector3(0.0, 0.18, ALTAR_Z - 0.15)
-	_mark(dais)
+	dais.position = Vector3(0.0, 0.2, ALTAR_Z + 0.55)
+	dais_body.add_child(dais)
+	var dais_shape := CollisionShape3D.new()
+	var dais_box := BoxShape3D.new()
+	dais_box.size = dais_mesh.size
+	dais_shape.shape = dais_box
+	dais_shape.position = dais.position
+	dais_body.add_child(dais_shape)
+	_mark(dais_body)
+
+
+func _build_altar_guardian_statues(stone: Material, stone_dark: Material) -> void:
+	## Greybox guardians on the flared diagonal walls; four eyes track Advanced clears.
+	var front_l := Vector3(-ALCOVE_OPENING_HALF_W, 0.0, BACK_Z)
+	var front_r := Vector3(ALCOVE_OPENING_HALF_W, 0.0, BACK_Z)
+	var slant_l := _alcove_slant_point(-1)
+	var slant_r := _alcove_slant_point(1)
+	_build_guardian_statue("AltarGuardian_L", front_l, slant_l, stone, stone_dark, ["1.8", "1.9"])
+	_build_guardian_statue("AltarGuardian_R", slant_r, front_r, stone, stone_dark, ["1.10", "1.11"])
+
+
+func _build_guardian_statue(
+	statue_name: String,
+	wall_a: Vector3,
+	wall_b: Vector3,
+	stone: Material,
+	stone_dark: Material,
+	eye_ids: Array
+) -> void:
+	var mid := (wall_a + wall_b) * 0.5
+	var tangent := Vector3(wall_b.x - wall_a.x, 0.0, wall_b.z - wall_a.z)
+	if tangent.length_squared() < 0.0001:
+		return
+	tangent = tangent.normalized()
+	var inward := Vector3(-tangent.z, 0.0, tangent.x)
+	var alcove_center := Vector3(0.0, 0.0, BACK_Z - ALCOVE_DEPTH * 0.45)
+	if inward.dot(alcove_center - mid) < 0.0:
+		inward = -inward
+
+	# ~arch height (ARCH_OPENING_H); stand clear of the diagonal wall.
+	var root := Node3D.new()
+	root.name = statue_name
+	root.position = mid + inward * 1.35
+	root.position.y = 0.0
+	# Face the central hearth — same forward sense as the Expert panels (+Z into the court).
+	var to_hearth := HEARTH_CENTER - root.position
+	to_hearth.y = 0.0
+	if to_hearth.length_squared() > 0.001:
+		root.rotation.y = atan2(to_hearth.x, to_hearth.z)
+	else:
+		root.rotation.y = 0.0
+
+	var base := MeshInstance3D.new()
+	var base_mesh := CylinderMesh.new()
+	base_mesh.top_radius = 1.05
+	base_mesh.bottom_radius = 1.25
+	base_mesh.height = 0.55
+	base.mesh = base_mesh
+	base.material_override = stone_dark
+	base.position = Vector3(0.0, 0.28, 0.0)
+	root.add_child(base)
+
+	var body := MeshInstance3D.new()
+	var body_mesh := BoxMesh.new()
+	body_mesh.size = Vector3(1.55, 2.85, 1.05)
+	body.mesh = body_mesh
+	body.material_override = stone
+	body.position = Vector3(0.0, 1.95, 0.0)
+	root.add_child(body)
+
+	var shoulders := MeshInstance3D.new()
+	var shoulder_mesh := BoxMesh.new()
+	shoulder_mesh.size = Vector3(2.05, 0.55, 0.85)
+	shoulders.mesh = shoulder_mesh
+	shoulders.material_override = stone
+	shoulders.position = Vector3(0.0, 3.25, 0.0)
+	root.add_child(shoulders)
+
+	var head := MeshInstance3D.new()
+	var head_mesh := SphereMesh.new()
+	head_mesh.radius = 0.58
+	head_mesh.height = 1.05
+	head.mesh = head_mesh
+	head.material_override = stone
+	head.position = Vector3(0.0, 3.95, 0.12)
+	root.add_child(head)
+
+	# Two eyes — lit by matching Advanced panel clears.
+	var eye_offsets := [Vector3(-0.22, 4.05, 0.58), Vector3(0.22, 4.05, 0.58)]
+	for i in mini(2, eye_ids.size()):
+		var eye := MeshInstance3D.new()
+		eye.name = "StatueEye_%s" % str(eye_ids[i]).replace(".", "_")
+		var eye_mesh := SphereMesh.new()
+		eye_mesh.radius = 0.1
+		eye_mesh.height = 0.18
+		eye.mesh = eye_mesh
+		eye.position = eye_offsets[i]
+		eye.set_meta("advanced_id", eye_ids[i])
+		eye.add_to_group("hestia_statue_eye")
+		var eye_mat := StandardMaterial3D.new()
+		eye_mat.albedo_color = Color(0.12, 0.1, 0.09)
+		eye_mat.emission_enabled = true
+		eye_mat.emission = Color(0.15, 0.08, 0.04)
+		eye_mat.emission_energy_multiplier = 0.05
+		eye_mat.roughness = 0.35
+		eye.material_override = eye_mat
+		root.add_child(eye)
+
+	_mark(root)
 
 
 func _build_back_alcove_arch(brick: Material, trim: Material, opening_left_x: float, opening_right_x: float, arch_z: float) -> void:
@@ -277,12 +399,12 @@ func _build_side_wall_with_arches(side: int, stone: Material, stone_dark: Materi
 
 	for arch_i in SIDE_ARCH_Z.size():
 		var arch_z: float = SIDE_ARCH_Z[arch_i]
-		# Left: 1.4 rear, 1.5 outer | Right: 1.6 rear, 1.7 outer
+		# Left: 1.8 rear, 1.9 outer | Right: 1.10 rear, 1.11 outer
 		var puzzle_id := ""
 		if side < 0:
-			puzzle_id = "1.4" if arch_i == 0 else "1.5"
+			puzzle_id = "1.8" if arch_i == 0 else "1.9"
 		else:
-			puzzle_id = "1.6" if arch_i == 0 else "1.7"
+			puzzle_id = "1.10" if arch_i == 0 else "1.11"
 		_build_wall_arch(side, arch_z, stone, stone_dark, trim, brick, panel_mat, puzzle_id, "%s_%d" % [side_name, arch_i])
 		_build_arch_supports_for_arch(side, arch_z, stone)
 
@@ -484,35 +606,61 @@ func _panel_world_pos(side: int, arch_index: int) -> Vector3:
 
 
 func _build_arc_barrier(stone_dark: Material) -> void:
+	## Rim barrier on the semicircle floor edge, sealed into both side walls.
 	var body := StaticBody3D.new()
 	body.name = "ArcBarrier"
 	body.collision_layer = 1
-	var segments := 18
+	# Match the semicircle floor outer radius (see _build_semicircle_floor).
+	var barrier_r := ARC_RADIUS + 1.35
+	var segments := 22
 	var arc_span := 180.0
 	for i in segments:
 		var a0 := -90.0 + arc_span * float(i) / float(segments)
 		var a1 := -90.0 + arc_span * float(i + 1) / float(segments)
-		var p0 := _arc_point(a0, ARC_RADIUS + 0.2)
-		var p1 := _arc_point(a1, ARC_RADIUS + 0.2)
-		var mid := (p0 + p1) * 0.5
-		var seg_len := p0.distance_to(p1)
-		var mesh := MeshInstance3D.new()
-		mesh.name = "ArcBarrierMesh_%d" % i
-		var box := BoxMesh.new()
-		box.size = Vector3(seg_len + 0.12, ARC_BARRIER_HEIGHT, 0.55)
-		mesh.mesh = box
-		mesh.material_override = stone_dark
-		mesh.position = Vector3(mid.x, ARC_BARRIER_HEIGHT * 0.5, mid.z)
-		mesh.rotation.y = atan2(p1.x - p0.x, p1.z - p0.z)
-		body.add_child(mesh)
-		var shape := CollisionShape3D.new()
-		var cs := BoxShape3D.new()
-		cs.size = box.size
-		shape.shape = cs
-		shape.position = mesh.position
-		shape.rotation = mesh.rotation
-		body.add_child(shape)
+		var p0 := _arc_point(a0, barrier_r)
+		var p1 := _arc_point(a1, barrier_r)
+		_add_arc_barrier_segment(body, p0, p1, stone_dark, i)
+
+	# Close the gaps between the ±90° arc ends and the side-wall inner faces.
+	for side in [-1, 1]:
+		var angle := 90.0 * float(side)
+		var arc_end := _arc_point(angle, barrier_r)
+		var wall_x := _wall_room_face_x(side)
+		# Overlap into the wall a bit so nothing slips through.
+		var wall_end := Vector3(wall_x + float(side) * 0.35, 0.0, arc_end.z)
+		_add_arc_barrier_segment(body, arc_end, wall_end, stone_dark, 100 + side)
+
 	_mark(body)
+
+
+func _add_arc_barrier_segment(
+	body: StaticBody3D,
+	p0: Vector3,
+	p1: Vector3,
+	stone_dark: Material,
+	seg_id: int
+) -> void:
+	var mid := (p0 + p1) * 0.5
+	var seg_len := p0.distance_to(p1)
+	if seg_len < 0.05:
+		return
+	var mesh := MeshInstance3D.new()
+	mesh.name = "ArcBarrierMesh_%d" % seg_id
+	var box := BoxMesh.new()
+	box.size = Vector3(seg_len + 0.2, ARC_BARRIER_HEIGHT, 0.65)
+	mesh.mesh = box
+	mesh.material_override = stone_dark
+	mesh.position = Vector3(mid.x, ARC_BARRIER_HEIGHT * 0.5, mid.z)
+	# Align local +X (segment length) with the run direction.
+	mesh.rotation.y = atan2(p1.x - p0.x, p1.z - p0.z) - PI * 0.5
+	body.add_child(mesh)
+	var shape := CollisionShape3D.new()
+	var cs := BoxShape3D.new()
+	cs.size = box.size
+	shape.shape = cs
+	shape.position = mesh.position
+	shape.rotation = mesh.rotation
+	body.add_child(shape)
 
 
 func _add_wall(wall_name: String, pos: Vector3, size: Vector3, mat: Material, rot_y: float = 0.0) -> void:
@@ -589,12 +737,15 @@ func _build_side_roofs(wood: Material) -> void:
 		_mark(wall_beam)
 
 
-func _build_sunken_hearth(stone_dark: Material, iron: Material) -> void:
-	var root := StaticBody3D.new()
+func _build_sunken_hearth(stone_dark: Material, iron: Material, panel_mat: Material, conduit_mat: Material) -> void:
+	var root := Node3D.new()
 	root.name = "CentralHearth"
 	root.position = HEARTH_CENTER
-	root.collision_layer = 1
 
+	# Fixed outer stone lip + ring barrier.
+	var outer_body := StaticBody3D.new()
+	outer_body.name = "OuterRing"
+	outer_body.collision_layer = 1
 	var outer := MeshInstance3D.new()
 	var outer_mesh := CylinderMesh.new()
 	outer_mesh.top_radius = HEARTH_RADIUS + 0.85
@@ -603,31 +754,7 @@ func _build_sunken_hearth(stone_dark: Material, iron: Material) -> void:
 	outer.mesh = outer_mesh
 	outer.material_override = stone_dark
 	outer.position = Vector3(0.0, 0.02, 0.0)
-	root.add_child(outer)
-
-	var pit := MeshInstance3D.new()
-	var pit_mesh := CylinderMesh.new()
-	pit_mesh.top_radius = HEARTH_RADIUS
-	pit_mesh.bottom_radius = HEARTH_RADIUS - 0.2
-	pit_mesh.height = 0.55
-	pit.mesh = pit_mesh
-	pit.material_override = iron
-	pit.position = Vector3(0.0, -0.12, 0.0)
-	root.add_child(pit)
-
-	var coals := MeshInstance3D.new()
-	var coal_mesh := CylinderMesh.new()
-	coal_mesh.top_radius = HEARTH_RADIUS - 0.35
-	coal_mesh.bottom_radius = HEARTH_RADIUS - 0.35
-	coal_mesh.height = 0.08
-	coals.mesh = coal_mesh
-	coals.material_override = _mat_stone(Color(0.12, 0.1, 0.08))
-	coals.position = Vector3(0.0, -0.28, 0.0)
-	root.add_child(coals)
-
-	var ring := StaticBody3D.new()
-	ring.name = "HearthRingCollider"
-	ring.collision_layer = 1
+	outer_body.add_child(outer)
 	for i in 8:
 		var angle := float(i) * TAU / 8.0
 		var next := float(i + 1) * TAU / 8.0
@@ -639,15 +766,143 @@ func _build_sunken_hearth(stone_dark: Material, iron: Material) -> void:
 		seg.shape = box
 		seg.position = Vector3(mid.x, 0.15, mid.z)
 		seg.rotation.y = atan2(mid.x, mid.z)
-		ring.add_child(seg)
-	root.add_child(ring)
+		outer_body.add_child(seg)
+	root.add_child(outer_body)
 
+	# Rising inner platform (pit + coals + walkable top).
+	var platform := AnimatableBody3D.new()
+	platform.name = "InnerPlatform"
+	platform.collision_layer = 1
+	platform.collision_mask = 0
+	platform.position = Vector3(0.0, HEARTH_PLATFORM_SUNK_Y, 0.0)
+	platform.set_meta("sunk_y", HEARTH_PLATFORM_SUNK_Y)
+	platform.set_meta("raised_y", HEARTH_PLATFORM_RAISED_Y)
+
+	var pit := MeshInstance3D.new()
+	var pit_mesh := CylinderMesh.new()
+	pit_mesh.top_radius = HEARTH_RADIUS
+	pit_mesh.bottom_radius = HEARTH_RADIUS - 0.2
+	pit_mesh.height = 0.55
+	pit.mesh = pit_mesh
+	pit.material_override = iron
+	pit.position = Vector3(0.0, -0.12, 0.0)
+	platform.add_child(pit)
+
+	var coals := MeshInstance3D.new()
+	coals.name = "HearthCoals"
+	var coal_mesh := CylinderMesh.new()
+	coal_mesh.top_radius = HEARTH_RADIUS - 0.35
+	coal_mesh.bottom_radius = HEARTH_RADIUS - 0.35
+	coal_mesh.height = 0.08
+	coals.mesh = coal_mesh
+	coals.material_override = _mat_stone(Color(0.12, 0.1, 0.08))
+	coals.position = Vector3(0.0, -0.28, 0.0)
+	platform.add_child(coals)
+
+	var cap := MeshInstance3D.new()
+	cap.name = "PlatformCap"
+	var cap_mesh := CylinderMesh.new()
+	cap_mesh.top_radius = HEARTH_RADIUS - 0.15
+	cap_mesh.bottom_radius = HEARTH_RADIUS - 0.15
+	cap_mesh.height = 0.12
+	cap.mesh = cap_mesh
+	cap.material_override = stone_dark
+	cap.position = Vector3(0.0, 0.18, 0.0)
+	platform.add_child(cap)
+
+	var platform_shape := CollisionShape3D.new()
+	var platform_cyl := CylinderShape3D.new()
+	platform_cyl.radius = HEARTH_RADIUS - 0.1
+	platform_cyl.height = 0.35
+	platform_shape.shape = platform_cyl
+	platform_shape.position = Vector3(0.0, 0.05, 0.0)
+	platform.add_child(platform_shape)
+
+	# Center flame — lit when platform finishes rising; grows with Intermediate clears.
+	var flame := MeshInstance3D.new()
+	flame.name = "HearthFlame"
+	var flame_mesh := SphereMesh.new()
+	flame_mesh.radius = 0.18
+	flame_mesh.height = 0.42
+	flame.mesh = flame_mesh
+	var flame_mat := _mat_emissive(Color(1.0, 0.45, 0.12), 0.15)
+	flame.material_override = flame_mat
+	flame.position = Vector3(0.0, 0.45, 0.0)
+	flame.scale = Vector3(0.01, 0.01, 0.01)
+	flame.visible = false
+	platform.add_child(flame)
+
+	var flame_light := OmniLight3D.new()
+	flame_light.name = "HearthFlameLight"
+	flame_light.light_color = Color(1.0, 0.48, 0.15)
+	flame_light.light_energy = 0.0
+	flame_light.omni_range = 6.0
+	flame_light.position = Vector3(0.0, 0.7, 0.0)
+	platform.add_child(flame_light)
+
+	root.add_child(platform)
+
+	# Four tilted console tablets on the outer ring (Intermediate 1.4–1.7).
+	var tablets := Node3D.new()
+	tablets.name = "HearthTablets"
+	tablets.position = Vector3(0.0, HEARTH_TABLETS_SUNK_Y, 0.0)
+	tablets.set_meta("sunk_y", HEARTH_TABLETS_SUNK_Y)
+	tablets.set_meta("raised_y", HEARTH_TABLETS_RAISED_Y)
+
+	var tablet_ids := ["1.4", "1.5", "1.6", "1.7"]
+	# Offset 45° so mounts sit between pillar sightlines.
+	var tablet_angles_deg := [45.0, 135.0, 225.0, 315.0]
+	var mount_r := HEARTH_RADIUS + 0.55
+	for i in tablet_ids.size():
+		var pid: String = tablet_ids[i]
+		var ang := deg_to_rad(tablet_angles_deg[i])
+		# XZ ring: +Z toward entrance arc.
+		var outward := Vector3(sin(ang), 0.0, cos(ang))
+		var mount := Node3D.new()
+		mount.name = "TabletMount_%s" % pid.replace(".", "_")
+		mount.position = outward * mount_r
+		# Face outward; tilt like a control tablet toward the standing player.
+		mount.rotation.y = atan2(outward.x, outward.z)
+		mount.rotation.x = deg_to_rad(-40.0)
+
+		var bezel := MeshInstance3D.new()
+		var bezel_mesh := BoxMesh.new()
+		bezel_mesh.size = Vector3(1.75, 1.75, 0.16)
+		bezel.mesh = bezel_mesh
+		bezel.material_override = stone_dark
+		bezel.position = Vector3(0.0, 0.0, -0.02)
+		mount.add_child(bezel)
+
+		var panel := LineTracePanel.new()
+		panel.name = "LinePanel_%s" % pid
+		panel.position = Vector3(0.0, 0.0, 0.08)
+		mount.add_child(panel)
+		panel.setup(_defs_for(pid), Vector3(1.55, 1.55, 0.1), Vector3(0.0, 0.0, 1.0), panel_mat)
+		# Buried until hearth reveal — not interactable / not solid yet.
+		panel.collision_layer = 0
+		panel.monitorable = false
+		panel.set_solid_enabled(false)
+		panel.set_meta("hearth_tablet", true)
+
+		tablets.add_child(mount)
+
+		var world_anchor := HEARTH_CENTER + outward * mount_r
+		_add_conduit_segment(
+			Vector3(world_anchor.x, 0.045, world_anchor.z),
+			Vector3(HEARTH_CENTER.x, 0.045, HEARTH_CENTER.z),
+			conduit_mat,
+			"TabletConduit_%s" % pid.replace(".", "_")
+		)
+
+	root.add_child(tablets)
 	_mark(root)
 
 
 func _build_pillar(pos: Vector3, puzzle_id: String, stone: Material, panel_mat: Material) -> void:
-	var root := Node3D.new()
+	var root := StaticBody3D.new()
 	root.name = "Pillar_%s" % puzzle_id
+	root.collision_layer = 1
+	root.collision_mask = 0
 	root.position = pos
 	var to_hearth := HEARTH_CENTER - pos
 	to_hearth.y = 0.0
@@ -662,6 +917,13 @@ func _build_pillar(pos: Vector3, puzzle_id: String, stone: Material, panel_mat: 
 	base.position = Vector3(0.0, 0.18, 0.0)
 	root.add_child(base)
 
+	var base_shape := CollisionShape3D.new()
+	var base_box := BoxShape3D.new()
+	base_box.size = Vector3(1.15, 0.35, 1.15)
+	base_shape.shape = base_box
+	base_shape.position = Vector3(0.0, 0.18, 0.0)
+	root.add_child(base_shape)
+
 	var shaft := MeshInstance3D.new()
 	var shaft_mesh := CylinderMesh.new()
 	shaft_mesh.top_radius = 0.5
@@ -671,6 +933,14 @@ func _build_pillar(pos: Vector3, puzzle_id: String, stone: Material, panel_mat: 
 	shaft.material_override = stone
 	shaft.position = Vector3(0.0, 2.1, 0.0)
 	root.add_child(shaft)
+
+	var shaft_shape := CollisionShape3D.new()
+	var shaft_cyl := CylinderShape3D.new()
+	shaft_cyl.radius = 0.52
+	shaft_cyl.height = 3.5
+	shaft_shape.shape = shaft_cyl
+	shaft_shape.position = Vector3(0.0, 2.1, 0.0)
+	root.add_child(shaft_shape)
 
 	for i in 4:
 		var flute := MeshInstance3D.new()
@@ -692,75 +962,168 @@ func _build_pillar(pos: Vector3, puzzle_id: String, stone: Material, panel_mat: 
 
 	var panel := LineTracePanel.new()
 	panel.name = "LinePanel_%s" % puzzle_id
-	panel.position = Vector3(0.0, 2.0, 0.58)
+	panel.position = Vector3(0.0, 2.05, 0.72)
 	root.add_child(panel)
-	panel.setup(_defs_for(puzzle_id), Vector3(0.95, 0.95, 0.1), Vector3(0.0, 0.0, 1.0), panel_mat)
+	panel.setup(_defs_for(puzzle_id), Vector3(1.35, 1.35, 0.12), Vector3(0.0, 0.0, 1.0), panel_mat)
 
 	_mark(root)
 
 
 func _build_eternal_flame_altar(pos: Vector3, stone: Material, trim: Material, flame_mat: Material) -> void:
-	var root := Node3D.new()
+	## Expert zone: central altar on the dais; 1.12 / 1.13 mounted on the back wall.
+	var root := StaticBody3D.new()
 	root.name = "EternalFlameAltar"
+	root.collision_layer = 1
+	root.collision_mask = 0
 	root.position = pos
 
-	for i in 2:
+	# Approach steps toward the hall (+Z).
+	for i in 3:
 		var step := MeshInstance3D.new()
 		var step_mesh := BoxMesh.new()
-		var w := 5.2 - float(i) * 0.9
-		step_mesh.size = Vector3(w, 0.3, 2.4 - float(i) * 0.35)
+		var w := 4.2 - float(i) * 0.55
+		var d := 1.35 - float(i) * 0.12
+		step_mesh.size = Vector3(w, 0.28, d)
 		step.mesh = step_mesh
 		step.material_override = stone
-		step.position = Vector3(0.0, 0.15 + float(i) * 0.3, float(i) * 0.12)
+		step.position = Vector3(0.0, 0.14 + float(i) * 0.28, 1.55 - float(i) * 0.35)
 		root.add_child(step)
+		var step_shape := CollisionShape3D.new()
+		var step_box := BoxShape3D.new()
+		step_box.size = step_mesh.size
+		step_shape.shape = step_box
+		step_shape.position = step.position
+		root.add_child(step_shape)
 
+	# Central altar block — no puzzle panels attached.
 	var altar := MeshInstance3D.new()
 	var altar_mesh := BoxMesh.new()
-	altar_mesh.size = Vector3(2.6, 0.85, 1.3)
+	altar_mesh.size = Vector3(2.2, 1.05, 1.45)
 	altar.mesh = altar_mesh
 	altar.material_override = trim
-	altar.position = Vector3(0.0, 0.72, 0.3)
+	altar.position = Vector3(0.0, 0.95, -0.15)
 	root.add_child(altar)
+	var altar_shape := CollisionShape3D.new()
+	var altar_box := BoxShape3D.new()
+	altar_box.size = altar_mesh.size
+	altar_shape.shape = altar_box
+	altar_shape.position = altar.position
+	root.add_child(altar_shape)
 
-	var altar_ids := ["1.8", "1.9"]
-	var slate_x := [-0.7, 0.7]
-	for i in 2:
-		var slate := LineTracePanel.new()
-		slate.name = "LinePanel_%s" % altar_ids[i]
-		slate.position = Vector3(slate_x[i], 1.35, 0.55)
-		# Stand upright facing the hearth (+Z toward court entrance is - wait: altar at back, hearth at +Z from altar... ALTAR_Z is more negative than hearth, so toward hearth is +Z)
-		slate.rotation.x = deg_to_rad(-18.0)
-		root.add_child(slate)
-		slate.setup(_defs_for(altar_ids[i]), Vector3(0.85, 0.85, 0.12), Vector3(0.0, 0.0, 1.0))
+	# Shallow bowl recess on top.
+	var bowl := MeshInstance3D.new()
+	var bowl_mesh := CylinderMesh.new()
+	bowl_mesh.top_radius = 0.42
+	bowl_mesh.bottom_radius = 0.48
+	bowl_mesh.height = 0.16
+	bowl.mesh = bowl_mesh
+	bowl.material_override = _mat_stone(Color(0.22, 0.18, 0.14), 0.8)
+	bowl.position = Vector3(0.0, 1.55, -0.15)
+	root.add_child(bowl)
 
 	var flame := MeshInstance3D.new()
 	flame.name = "AltarFlame"
 	var flame_mesh := CylinderMesh.new()
-	flame_mesh.top_radius = 0.22
-	flame_mesh.bottom_radius = 0.08
-	flame_mesh.height = 0.55
+	flame_mesh.top_radius = 0.28
+	flame_mesh.bottom_radius = 0.1
+	flame_mesh.height = 0.7
 	flame.mesh = flame_mesh
 	flame.material_override = flame_mat
-	flame.position = Vector3(0.0, 1.55, 0.3)
+	flame.position = Vector3(0.0, 1.95, -0.15)
 	root.add_child(flame)
 
 	var light := OmniLight3D.new()
 	light.name = "AltarLight"
 	light.light_color = Color(1.0, 0.5, 0.18)
 	light.light_energy = 0.6
-	light.omni_range = 10.0
-	light.position = Vector3(0.0, 2.0, 0.3)
+	light.omni_range = 12.0
+	light.position = Vector3(0.0, 2.4, -0.15)
 	root.add_child(light)
 
 	var label := Label3D.new()
-	label.text = "1.8–1.9 Eternal Flame"
+	label.text = "1.12–1.13 Eternal Flame"
 	label.font_size = 32
 	label.pixel_size = 0.008
-	label.position = Vector3(0.0, 3.0, 0.3)
+	label.position = Vector3(0.0, 3.35, -0.15)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	root.add_child(label)
 
 	_mark(root)
+
+	# Expert panels mounted on the flat back wall (left / right), facing into the alcove.
+	_build_expert_back_wall_panels(stone)
+
+
+func _build_expert_back_wall_panels(stone: Material) -> void:
+	var back_z := _alcove_back_z()
+	var panel_mat := _mat_stone(Color(0.58, 0.56, 0.54), 0.9)
+	var altar_ids := ["1.12", "1.13"]
+	var panel_x := [-3.55, 3.55]
+	var panel_size := Vector3(4.05, 4.05, 0.24)
+	var panel_y := 4.15
+	# Reach well past the alcove mouth into the main hall.
+	var remote_reach := ALCOVE_DEPTH + 9.0
+	# Embedded flush in the back wall until Advanced clears awaken the guardians.
+	const EMBEDDED_Z := -0.55
+	const REVEALED_Z := 0.55
+	for i in 2:
+		var mount := Node3D.new()
+		mount.name = "ExpertPanelMount_%s" % altar_ids[i].replace(".", "_")
+		mount.position = Vector3(panel_x[i], 0.0, back_z)
+
+		var slide := StaticBody3D.new()
+		slide.name = "ExpertPanelSlide"
+		slide.collision_layer = 0
+		slide.position = Vector3(0.0, 0.0, EMBEDDED_Z)
+		slide.set_meta("embedded_z", EMBEDDED_Z)
+		slide.set_meta("revealed_z", REVEALED_Z)
+		slide.add_to_group("hestia_expert_slide")
+		mount.add_child(slide)
+
+		var bezel := MeshInstance3D.new()
+		var bezel_mesh := BoxMesh.new()
+		bezel_mesh.size = Vector3(panel_size.x + 0.32, panel_size.y + 0.32, 0.24)
+		bezel.mesh = bezel_mesh
+		bezel.material_override = stone
+		bezel.position = Vector3(0.0, panel_y, -0.06)
+		slide.add_child(bezel)
+		var bezel_shape := CollisionShape3D.new()
+		var bezel_box := BoxShape3D.new()
+		bezel_box.size = bezel_mesh.size
+		bezel_shape.shape = bezel_box
+		bezel_shape.position = bezel.position
+		slide.add_child(bezel_shape)
+
+		var slate := LineTracePanel.new()
+		slate.name = "LinePanel_%s" % altar_ids[i]
+		slate.position = Vector3(0.0, panel_y, 0.14)
+		slate.set_meta("expert_panel", true)
+		slide.add_child(slate)
+		slate.setup(_defs_for(altar_ids[i]), panel_size, Vector3(0.0, 0.0, 1.0), panel_mat)
+		slate.enable_remote_play(remote_reach)
+		# Buried: not solid / not interactable until emerged.
+		slate.collision_layer = 0
+		slate.monitorable = false
+		slate.set_solid_enabled(false)
+
+		_mark(mount)
+
+	_build_altar_entry_barrier()
+
+
+func _build_altar_entry_barrier() -> void:
+	## Invisible wall across the alcove mouth — blocks the player, not interact rays.
+	var barrier := StaticBody3D.new()
+	barrier.name = "AltarEntryBarrier"
+	barrier.collision_layer = 4
+	barrier.collision_mask = 0
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(ALCOVE_OPENING_HALF_W * 2.2, wall_height, 0.35)
+	shape.shape = box
+	shape.position = Vector3(0.0, wall_height * 0.5, BACK_Z + 0.12)
+	barrier.add_child(shape)
+	_mark(barrier)
 
 
 func _build_conduit_network(mat: Material) -> void:
@@ -770,13 +1133,10 @@ func _build_conduit_network(mat: Material) -> void:
 
 	for i in 3:
 		var pillar := _pillar_point(PILLAR_ARC_ANGLES[i])
-		_add_conduit_segment(Vector3(pillar.x, y, pillar.z), hearth, mat, "Pillar_1_%d" % (i + 1))
+		_add_conduit_segment(Vector3(pillar.x, y, pillar.z), hearth, mat, "PillarConduit_1_%d" % (i + 1))
 
-	for side: int in [-1, 1]:
-		for arch_i in SIDE_ARCH_Z.size():
-			var anchor := _panel_world_pos(side, arch_i)
-			_add_conduit_segment(anchor, hearth, mat, "Panel_%d_%d" % [side, arch_i])
-			_add_conduit_riser(anchor, FLOOR_BASE_Y + PANEL_FLOAT_H, mat, "PanelRiser_%d_%d" % [side, arch_i])
+	# Advanced side arches intentionally have no floor conduits to the hearth —
+	# they unlock via the hearth-fire / torch lighting sequence instead.
 
 	_add_conduit_segment(altar, hearth, mat, "Altar")
 
@@ -815,38 +1175,50 @@ func _add_conduit_riser(anchor: Vector3, top_y: float, mat: Material, seg_name: 
 
 func _build_torches_on_supports(stone_dark: Material) -> void:
 	var flame := _mat_emissive(Color(1.0, 0.45, 0.12), 1.8)
-	var z_positions := _arch_support_z_positions()
 	var torch_y := 3.6
 	for side: int in [-1, 1]:
 		var support_x := _wall_room_face_x(side) - float(side) * 0.22
-		for i in z_positions.size():
-			var pos := Vector3(support_x - float(side) * 0.18, torch_y, z_positions[i])
-			var holder := MeshInstance3D.new()
-			holder.name = "TorchHolder_%s_%d" % [side, i]
-			var holder_mesh := BoxMesh.new()
-			holder_mesh.size = Vector3(0.2, 0.65, 0.2)
-			holder.mesh = holder_mesh
-			holder.material_override = stone_dark
-			holder.position = pos
-			_mark(holder)
+		for arch_i in SIDE_ARCH_Z.size():
+			var arch_z: float = SIDE_ARCH_Z[arch_i]
+			var puzzle_id := ""
+			if side < 0:
+				puzzle_id = "1.8" if arch_i == 0 else "1.9"
+			else:
+				puzzle_id = "1.10" if arch_i == 0 else "1.11"
+			for flank: int in [-1, 1]:
+				var z_pos := _arch_flank_support_z(arch_z, flank)
+				var pos := Vector3(support_x - float(side) * 0.18, torch_y, z_pos)
 
-			var fire := MeshInstance3D.new()
-			var fire_mesh := SphereMesh.new()
-			fire_mesh.radius = 0.11
-			fire_mesh.height = 0.22
-			fire.mesh = fire_mesh
-			fire.material_override = flame
-			fire.position = pos + Vector3(0.0, 0.48, 0.0)
-			fire.add_to_group("hestia_torch_flame")
-			_mark(fire)
+				var holder := MeshInstance3D.new()
+				holder.name = "TorchHolder_%s_%s_%d" % [puzzle_id.replace(".", "_"), side, flank]
+				var holder_mesh := BoxMesh.new()
+				holder_mesh.size = Vector3(0.2, 0.65, 0.2)
+				holder.mesh = holder_mesh
+				holder.material_override = stone_dark
+				holder.position = pos
+				_mark(holder)
 
-			var light := OmniLight3D.new()
-			light.light_color = Color(1.0, 0.45, 0.15)
-			light.light_energy = 0.15
-			light.omni_range = 8.0
-			light.position = pos + Vector3(0.0, 0.5, 0.0)
-			light.add_to_group("hestia_torch_light")
-			_mark(light)
+				var fire := MeshInstance3D.new()
+				fire.name = "TorchFlame_%s_%d" % [puzzle_id.replace(".", "_"), flank]
+				var fire_mesh := SphereMesh.new()
+				fire_mesh.radius = 0.11
+				fire_mesh.height = 0.22
+				fire.mesh = fire_mesh
+				fire.material_override = flame
+				fire.position = pos + Vector3(0.0, 0.48, 0.0)
+				fire.add_to_group("hestia_torch_flame")
+				fire.set_meta("advanced_id", puzzle_id)
+				_mark(fire)
+
+				var light := OmniLight3D.new()
+				light.name = "TorchLight_%s_%d" % [puzzle_id.replace(".", "_"), flank]
+				light.light_color = Color(1.0, 0.45, 0.15)
+				light.light_energy = 0.08
+				light.omni_range = 8.0
+				light.position = pos + Vector3(0.0, 0.5, 0.0)
+				light.add_to_group("hestia_torch_light")
+				light.set_meta("advanced_id", puzzle_id)
+				_mark(light)
 
 
 func _defs_for(puzzle_id: String) -> LineTraceDefs:
@@ -856,11 +1228,11 @@ func _defs_for(puzzle_id: String) -> LineTraceDefs:
 	var fallback := LineTraceDefs.new()
 	fallback.puzzle_id = puzzle_id
 	fallback.title = puzzle_id
-	fallback.grid_w = 3
-	fallback.grid_h = 3
-	fallback.starts = [Vector2i(0, 1)]
-	fallback.exits = [Vector2i(2, 1)]
-	fallback.fuels = [Vector2i(1, 1)]
+	fallback.grid_w = 4
+	fallback.grid_h = 4
+	fallback.starts = [Vector2i(0, 0)]
+	fallback.exits = [Vector2i(3, 0)]
+	fallback.black_pieces = [Vector2i(1, 1)]
 	return fallback
 
 

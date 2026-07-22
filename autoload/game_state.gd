@@ -7,13 +7,13 @@ signal zone_completed(zone_id: String)
 signal keys_changed
 
 const SAVE_PATH := "user://save.json"
-const SAVE_VERSION := 3
+const SAVE_VERSION := 5
 
 const ZONE_HUB := "hub"
 
 ## Play order — Tier 1 teach → Tier 4 finale (see COURT_META for themes).
 const COURT_ORDER: Array[String] = [
-	"hestia",      # 1  Tier 1 — branching lines (Witness)
+	"hestia",      # 1  Tier 1 — sandwich-capture lines
 	"hermes",      # 2  Tier 1 — timed lines
 	"ares",        # 3  Tier 1 — parallel mirror movement
 	"demeter",     # 4  Tier 2 — environmental routing (refreshment)
@@ -30,8 +30,8 @@ const COURT_ORDER: Array[String] = [
 ## name / title = hub labels; theme = environment note; tier + verb = design reference.
 const COURT_META := {
 	"hestia": {
-		"name": "Hestia", "title": "The Hearth Megaron", "tier": 1, "puzzles": 9,
-		"verb": "Branching lines",
+		"name": "Hestia", "title": "The Hearth Megaron", "tier": 1, "puzzles": 13,
+		"verb": "Sandwich-capture lines",
 		"theme": "Classical Greek megaron — terracotta, wooden beams, cold sunken hearth; fire spreads through copper floor conduits to bronze wall torches.",
 		"color": Color(0.9, 0.45, 0.2),
 	},
@@ -109,6 +109,8 @@ var completed_zones: Array[String] = []
 var keys: Array[String] = []
 ## zone_id -> Array of solved puzzle id strings (e.g. "1.1")
 var solved_puzzles: Dictionary = {}
+## zone_id -> { puzzle_id -> Array of {x,y} dicts } for solved path display
+var solved_paths: Dictionary = {}
 var spawn_point_id: String = "default"
 var current_zone_id: String = ZONE_HUB
 
@@ -178,6 +180,33 @@ func mark_puzzle_solved(zone_id: String, puzzle_id: String) -> void:
 	save_game()
 
 
+func set_puzzle_path(zone_id: String, puzzle_id: String, path: Array) -> void:
+	if not solved_paths.has(zone_id):
+		solved_paths[zone_id] = {}
+	var zone_paths: Dictionary = solved_paths[zone_id]
+	var packed: Array = []
+	for cell in path:
+		if cell is Vector2i:
+			packed.append({"x": cell.x, "y": cell.y})
+		elif typeof(cell) == TYPE_DICTIONARY:
+			packed.append({"x": int(cell.get("x", 0)), "y": int(cell.get("y", 0))})
+	zone_paths[puzzle_id] = packed
+	solved_paths[zone_id] = zone_paths
+	save_game()
+
+
+func get_puzzle_path(zone_id: String, puzzle_id: String) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var zone_paths: Dictionary = solved_paths.get(zone_id, {})
+	var packed: Array = zone_paths.get(puzzle_id, [])
+	for cell in packed:
+		if typeof(cell) == TYPE_DICTIONARY:
+			out.append(Vector2i(int(cell.get("x", 0)), int(cell.get("y", 0))))
+		elif cell is Vector2i:
+			out.append(cell)
+	return out
+
+
 func get_solved_puzzles(zone_id: String) -> Array:
 	return solved_puzzles.get(zone_id, [])
 
@@ -189,6 +218,7 @@ func save_game() -> void:
 		"completed_zones": completed_zones,
 		"keys": keys,
 		"solved_puzzles": solved_puzzles,
+		"solved_paths": solved_paths,
 		"spawn_point_id": spawn_point_id,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -216,6 +246,7 @@ func load_game() -> void:
 	completed_zones.assign(data.get("completed_zones", []))
 	keys.assign(data.get("keys", []))
 	solved_puzzles = data.get("solved_puzzles", {})
+	solved_paths = data.get("solved_paths", {})
 	spawn_point_id = str(data.get("spawn_point_id", "default"))
 
 
@@ -227,14 +258,22 @@ func _migrate_save(old_data: Dictionary) -> void:
 		completed_zones = []
 		keys = []
 		solved_puzzles = {}
+		solved_paths = {}
 		spawn_point_id = "default"
 		save_game()
 		return
-	# v2 -> v3: keep progress, add empty puzzle map.
+	# v2–v4 -> v5: keep unlocks/solves; add path map (and clear hestia if coming from pre-sandwich).
 	unlocked_zones.assign(old_data.get("unlocked_zones", ["hestia"]))
 	completed_zones.assign(old_data.get("completed_zones", []))
 	keys.assign(old_data.get("keys", []))
 	solved_puzzles = old_data.get("solved_puzzles", {})
+	solved_paths = old_data.get("solved_paths", {})
+	if version < 4:
+		if solved_puzzles.has("hestia"):
+			solved_puzzles["hestia"] = []
+		if "hestia" in completed_zones:
+			completed_zones.erase("hestia")
+		solved_paths.erase("hestia")
 	spawn_point_id = str(old_data.get("spawn_point_id", "default"))
 	save_game()
 
@@ -244,6 +283,7 @@ func reset_progress() -> void:
 	completed_zones = []
 	keys = []
 	solved_puzzles = {}
+	solved_paths = {}
 	spawn_point_id = "default"
 	save_game()
 	print("[DEV] Progress reset — only Hestia unlocked.")
