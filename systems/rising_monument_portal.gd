@@ -2,12 +2,14 @@ extends Area3D
 
 ## Floor pad: stepping here raises a rectangular stele from flush-with-ground to upright.
 ## Press E while on the pad (or looking at the stele) to teleport.
+## Cleared courts keep the stele permanently risen (no proximity animation).
 
 @export var destination_scene_id: String = "hestia"
 @export var destination_spawn_id: String = "from_hub"
 @export var require_unlocked: bool = true
 @export var open_prompt: String = "Press E — Enter"
 @export var locked_prompt: String = "Sealed"
+@export var cleared_prompt: String = ""
 @export var stele_height: float = 1.35
 @export var rise_seconds: float = 0.45
 
@@ -48,6 +50,8 @@ func _ready() -> void:
 		GameState.zone_unlocked.connect(_on_progress)
 	if not GameState.zone_completed.is_connected(_on_progress):
 		GameState.zone_completed.connect(_on_progress)
+	# Permanent-raised state is applied from GodShrine.setup → refresh_visuals
+	# (destination_scene_id is configured after this node enters the tree).
 
 
 func _on_progress(_zone_id: String = "") -> void:
@@ -55,12 +59,16 @@ func _on_progress(_zone_id: String = "") -> void:
 	_refresh_label()
 	if _is_locked() and _raised:
 		_set_raised(false)
+	elif _stays_raised():
+		_set_raised(true, false)
 
 
 func _on_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("player"):
 		return
 	_players_inside += 1
+	if _stays_raised():
+		return
 	if _players_inside == 1:
 		_set_raised(not _is_locked())
 
@@ -69,23 +77,30 @@ func _on_body_exited(body: Node3D) -> void:
 	if not body.is_in_group("player"):
 		return
 	_players_inside = maxi(_players_inside - 1, 0)
+	if _stays_raised():
+		return
 	if _players_inside == 0:
 		_set_raised(false)
 
 
-func _set_raised(should_raise: bool) -> void:
-	if should_raise == _raised:
-		# Still ensure collision state if re-entering mid-tween.
-		pass
+func _set_raised(should_raise: bool, animate: bool = true) -> void:
+	if should_raise == _raised and animate:
+		_stele.collision_layer = 4 if should_raise else 0
+		_refresh_label()
+		return
 	_raised = should_raise
 
+	var target_y := _raised_y if should_raise else _buried_y
 	if _tween:
 		_tween.kill()
-	_tween = create_tween()
-	_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_tween = null
 
-	var target_y := _raised_y if should_raise else _buried_y
-	_tween.tween_property(_stele, "position:y", target_y, rise_seconds)
+	if animate:
+		_tween = create_tween()
+		_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_tween.tween_property(_stele, "position:y", target_y, rise_seconds)
+	else:
+		_stele.position.y = target_y
 
 	# Raycast can hit the stone while risen (backup to pad E).
 	_stele.collision_layer = 4 if should_raise else 0
@@ -98,6 +113,16 @@ func _is_locked() -> bool:
 	if destination_scene_id == GameState.ZONE_HUB:
 		return false
 	return not GameState.is_zone_unlocked(destination_scene_id)
+
+
+func _is_cleared() -> bool:
+	if destination_scene_id == GameState.ZONE_HUB:
+		return false
+	return destination_scene_id in GameState.completed_zones
+
+
+func _stays_raised() -> bool:
+	return _is_cleared() and not _is_locked()
 
 
 func is_ready_to_enter() -> bool:
@@ -113,6 +138,8 @@ func get_prompt() -> String:
 		return locked_prompt
 	if not _raised:
 		return ""
+	if _is_cleared() and cleared_prompt != "":
+		return cleared_prompt
 	return open_prompt
 
 
@@ -130,7 +157,7 @@ func _refresh_label() -> void:
 		_label.modulate = Color(0.85, 0.45, 0.4)
 		_label.visible = _raised
 	elif _raised:
-		_label.text = open_prompt
+		_label.text = cleared_prompt if (_is_cleared() and cleared_prompt != "") else open_prompt
 		_label.modulate = Color(0.75, 1.0, 0.8)
 		_label.visible = true
 	else:
@@ -150,6 +177,11 @@ func _refresh_pad() -> void:
 	if _is_locked():
 		mat.albedo_color = Color(0.28, 0.26, 0.24, 0.9)
 		mat.emission_enabled = false
+	elif _is_cleared():
+		mat.albedo_color = Color(0.55, 0.5, 0.4, 0.75)
+		mat.emission_enabled = true
+		mat.emission = Color(0.7, 0.6, 0.35)
+		mat.emission_energy_multiplier = 0.7
 	else:
 		mat.albedo_color = Color(0.55, 0.5, 0.4, 0.75)
 		mat.emission_enabled = true
@@ -172,10 +204,14 @@ func apply_god_color(color: Color) -> void:
 		pad.albedo_color = Color(color.r, color.g, color.b, 0.55)
 		pad.emission_enabled = true
 		pad.emission = color
-		pad.emission_energy_multiplier = 0.55
+		pad.emission_energy_multiplier = 0.7 if _is_cleared() else 0.55
 		pad.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
 
 func refresh_visuals() -> void:
 	_refresh_pad()
 	_refresh_label()
+	if _stays_raised():
+		_set_raised(true, false)
+	elif _players_inside == 0:
+		_set_raised(false, false)

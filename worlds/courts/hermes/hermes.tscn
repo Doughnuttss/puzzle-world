@@ -1,0 +1,74 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://systems/world_bootstrap.gd" id="1_boot"]
+[ext_resource type="Script" path="res://systems/spawn_point.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://worlds/courts/hermes/hermes.gd" id="3_court"]
+[ext_resource type="Script" path="res://worlds/courts/hermes/hermes_court_builder.gd" id="4_builder"]
+
+[sub_resource type="Environment" id="Environment_hermes"]
+background_mode = 1
+background_color = Color(0.45, 0.62, 0.88, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.75, 0.82, 0.95, 1)
+ambient_light_energy = 0.55
+tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 0.35
+glow_bloom = 0.12
+fog_enabled = true
+fog_light_color = Color(0.7, 0.78, 0.92, 1)
+fog_density = 0.0018
+fog_aerial_perspective = 0.35
+
+[node name="Hermes" type="Node3D"]
+script = ExtResource("3_court")
+
+[node name="WorldBootstrap" type="Node3D" parent="."]
+script = ExtResource("1_boot")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_hermes")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0.17101, 0.939693, 0.296198, -0.469846, -0.17101, 0.866025, 6, 18, 10)
+light_color = Color(1, 0.95, 0.85, 1)
+light_energy = 1.15
+shadow_enabled = true
+
+[node name="FillLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.707107, -0.353553, -0.612372, 0.0, 0.866025, -0.5, 0.707107, -0.353553, -0.612372, -8, 10, -4)
+light_color = Color(0.65, 0.75, 0.95, 1)
+light_energy = 0.35
+shadow_enabled = false
+
+[node name="CourtBuilder" type="Node3D" parent="."]
+script = ExtResource("4_builder")
+
+[node name="Title" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.5, 22)
+pixel_size = 0.018
+billboard = 1
+text = "Hermes — The Cloud Bridge"
+font_size = 48
+outline_size = 10
+horizontal_alignment = 1
+
+[node name="Hint" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.7, 22)
+pixel_size = 0.009
+billboard = 1
+modulate = Color(0.95, 0.9, 0.7, 1)
+text = "Sky temple greybox · five zones · puzzles coming soon · stele returns to hub"
+font_size = 22
+outline_size = 5
+horizontal_alignment = 1
+
+[node name="Spawn_FromHub" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 31.5)
+script = ExtResource("2_spawn")
+spawn_id = "from_hub"
+
+[node name="Spawn_Default" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 31.5)
+script = ExtResource("2_spawn")
+spawn_id = "default"

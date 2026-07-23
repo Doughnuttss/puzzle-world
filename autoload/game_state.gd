@@ -37,8 +37,8 @@ const COURT_META := {
 	},
 	"hermes": {
 		"name": "Hermes", "title": "The Cloud Bridge", "tier": 1, "puzzles": 8,
-		"verb": "Timed lines",
-		"theme": "Open-air marble bridge above endless clouds — white Pentelic stone, gold wings, long morning shadows.",
+		"verb": "Galewind sandwich lines",
+		"theme": "Open-air marble sky temple above endless clouds — white Pentelic stone, gold wings, five floating plazas linked by wind bridges.",
 		"color": Color(0.7, 0.55, 0.3),
 	},
 	"ares": {
