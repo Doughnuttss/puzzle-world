@@ -16,6 +16,12 @@ const HEARTH_REVEAL_SEC := 3.6
 const ADV_DIM_PAUSE_SEC := 1.4
 const ADV_LIGHT_STEP_SEC := 0.85
 const EXPERT_EMERGE_SEC := 2.8
+const ALTAR_RISE_SEC := 3.4
+const ALTAR_PORTAL_OPEN_SEC := 1.1
+## Match hestia_court_builder hearth / altar layout for arrival spawns.
+const SPAWN_HEARTH := Vector3(0.0, 0.0, 3.1)
+## Back in the main hall, looking toward the altar alcove (-Z).
+const SPAWN_ALTAR := Vector3(0.0, 0.0, -8.5)
 
 var _panels: Dictionary = {}  # puzzle_id -> LineTracePanel
 var _conduit_cold: StandardMaterial3D
@@ -29,6 +35,8 @@ var _adv_enabled_count: int = 0
 var _adv_reveal_tween: Tween
 var _experts_emerged: bool = false
 var _expert_tween: Tween
+var _altar_risen: bool = false
+var _altar_tween: Tween
 
 
 func _ready() -> void:
@@ -38,6 +46,7 @@ func _ready() -> void:
 
 
 func _boot() -> void:
+	_apply_spawn_points()
 	await get_tree().process_frame
 	_collect_panels()
 	_apply_saved_progress()
@@ -54,6 +63,22 @@ func _boot() -> void:
 		_set_all_advanced_torches(false)
 	_refresh_statue_eyes()
 	_set_experts_emerged(_all_solved(ADVANCED), false)
+	_set_altar_risen(_all_solved(EXPERT), false)
+
+
+func _apply_spawn_points() -> void:
+	## Incomplete → central hearth. Cleared → just in front of the altar.
+	var completed := ZONE_ID in GameState.completed_zones or _all_solved(EXPERT)
+	var pos := SPAWN_ALTAR if completed else SPAWN_HEARTH
+	var scene := get_parent()
+	if scene == null:
+		scene = get_tree().current_scene
+	if scene == null:
+		return
+	for node in scene.get_children():
+		if node is SpawnPoint or (node is Node3D and node.is_in_group("spawn_point")):
+			(node as Node3D).position = pos
+			(node as Node3D).rotation = Vector3.ZERO
 
 
 func _make_emissive(color: Color, energy: float) -> StandardMaterial3D:
@@ -101,6 +126,8 @@ func _on_panel_solved(puzzle_id: String) -> void:
 
 	if _all_solved(EXPERT):
 		GameState.complete_zone(ZONE_ID)
+		_set_altar_risen(true, true)
+		_apply_spawn_points()
 
 
 func _apply_saved_progress() -> void:
@@ -441,16 +468,108 @@ func _set_altar_flame(lit: bool) -> void:
 	var altar := _find_generated("EternalFlameAltar")
 	if altar == null:
 		return
-	var light := altar.get_node_or_null("AltarLight")
+	var light := altar.find_child("AltarLight", true, false)
 	if light is OmniLight3D:
 		(light as OmniLight3D).light_energy = 3.2 if lit else 0.6
-	var flame := altar.get_node_or_null("AltarFlame")
+	var flame := altar.find_child("AltarFlame", true, false)
 	if flame is MeshInstance3D:
 		var mesh := flame as MeshInstance3D
 		if mesh.material_override is StandardMaterial3D:
 			var mat := (mesh.material_override as StandardMaterial3D).duplicate() as StandardMaterial3D
 			mat.emission_energy_multiplier = 2.4 if lit else 0.5
 			mesh.material_override = mat
+
+
+func _set_altar_risen(risen: bool, animate: bool) -> void:
+	if risen == _altar_risen and animate:
+		return
+	var was := _altar_risen
+	_altar_risen = risen
+
+	var rising := _find_generated("AltarRising") as Node3D
+	if rising == null:
+		return
+
+	var sunk: float = float(rising.get_meta("sunk_y", 0.0))
+	var raised: float = float(rising.get_meta("raised_y", 1.15))
+	var target := raised if risen else sunk
+
+	if _altar_tween != null and _altar_tween.is_valid():
+		_altar_tween.kill()
+
+	# Allow walking into the alcove once the eternal flame awakens.
+	_set_alcove_barrier_open(risen)
+
+	if animate and risen and not was:
+		_set_altar_portal_active(false)
+		_altar_tween = create_tween()
+		_altar_tween.set_ease(Tween.EASE_OUT)
+		_altar_tween.set_trans(Tween.TRANS_CUBIC)
+		_altar_tween.tween_property(rising, "position:y", target, ALTAR_RISE_SEC)
+		_altar_tween.tween_callback(_on_altar_rise_finished)
+	else:
+		rising.position.y = target
+		_set_altar_portal_active(risen)
+
+
+func _on_altar_rise_finished() -> void:
+	_set_altar_portal_active(_altar_risen)
+
+
+func _set_alcove_barrier_open(open: bool) -> void:
+	var barrier := _find_generated("AltarEntryBarrier")
+	if barrier is StaticBody3D:
+		(barrier as StaticBody3D).collision_layer = 0 if open else 4
+
+
+func _set_altar_portal_active(active: bool) -> void:
+	var portal := _find_generated("AltarHubPortal") as Area3D
+	if portal == null:
+		return
+
+	portal.visible = active
+	portal.monitoring = active
+	portal.monitorable = active
+	portal.set_meta("portal_ready", active)
+
+	# Portal replaces the bowl flame in the altar middle.
+	var bowl := _find_generated("AltarBowl") as Node3D
+	if bowl:
+		bowl.visible = not active
+	var flame := _find_generated("AltarFlame") as Node3D
+	if flame:
+		flame.visible = not active
+	var altar_label := _find_generated("AltarLabel") as Label3D
+	if altar_label:
+		altar_label.visible = not active
+
+	var label := portal.get_node_or_null("Label3D") as Label3D
+	if label:
+		label.visible = active
+		if active:
+			label.text = "Return to Hub"
+			label.modulate = Color(1.0, 0.85, 0.55)
+
+	var gate := portal.get_node_or_null("PortalGate") as MeshInstance3D
+	if gate == null:
+		return
+
+	if active:
+		if gate.material_override is StandardMaterial3D:
+			var mat := (gate.material_override as StandardMaterial3D).duplicate() as StandardMaterial3D
+			mat.emission_energy_multiplier = 2.8
+			gate.material_override = mat
+		var tw := create_tween()
+		tw.set_ease(Tween.EASE_OUT)
+		tw.set_trans(Tween.TRANS_BACK)
+		gate.scale = Vector3(0.05, 0.05, 0.05)
+		tw.tween_property(gate, "scale", Vector3.ONE, ALTAR_PORTAL_OPEN_SEC)
+	else:
+		gate.scale = Vector3(0.05, 0.05, 0.05)
+		if gate.material_override is StandardMaterial3D:
+			var mat2 := (gate.material_override as StandardMaterial3D).duplicate() as StandardMaterial3D
+			mat2.emission_energy_multiplier = 0.0
+			gate.material_override = mat2
 
 
 func _find_generated(node_name: String) -> Node:

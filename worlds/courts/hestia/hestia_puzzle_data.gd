@@ -133,25 +133,28 @@ static func make_1_11() -> LineTraceDefs:
 		[Vector2i(1, 3), Vector2i(3, 2), Vector2i(3, 4), Vector2i(4, 1)])
 
 
-# --- Expert 8x8 — altar (open board, gapped coals; few solutions, no maze walls) ---
+# --- Expert 8x8 — altar ---
 
 static func make_1_12() -> LineTraceDefs:
-	## Vertical grate weave: bottom-left spark → top-right exit. Fourteen coals, no dead stone.
-	return _def("1.12", "1.12 — Flue Lattice", 8, 8,
-		[Vector2i(0, 7)], [Vector2i(7, 0)],
+	return _def("1.12", "1.12 — Long Flue", 8, 8,
+		[Vector2i(0, 0)], [Vector2i(7, 6)],
 		[
-			Vector2i(1, 1), Vector2i(1, 3), Vector2i(1, 4), Vector2i(1, 5), Vector2i(1, 6),
-			Vector2i(3, 0), Vector2i(3, 2), Vector2i(3, 4), Vector2i(3, 6),
-			Vector2i(5, 1), Vector2i(5, 2), Vector2i(5, 3), Vector2i(5, 5), Vector2i(5, 7),
+			Vector2i(2, 1), Vector2i(5, 1), Vector2i(2, 3),
+			Vector2i(4, 4), Vector2i(5, 5), Vector2i(1, 6),
+		],
+		[
+			Vector2i(0, 2), Vector2i(1, 3), Vector2i(6, 3), Vector2i(1, 5),
 		])
 
 
 static func make_1_13() -> LineTraceDefs:
-	## Horizontal grate weave: corner spark → opposite exit. Fourteen coals, no dead stone.
-	return _def("1.13", "1.13 — Triple Grate", 8, 8,
-		[Vector2i(0, 0)], [Vector2i(7, 7)],
+	return _def("1.13", "1.13 — Inner Spark", 8, 8,
+		[Vector2i(1, 1)], [Vector2i(3, 5)],
 		[
-			Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 1), Vector2i(4, 1), Vector2i(6, 1),
-			Vector2i(1, 3), Vector2i(3, 3), Vector2i(5, 3), Vector2i(7, 3),
-			Vector2i(0, 5), Vector2i(2, 5), Vector2i(4, 5), Vector2i(5, 5), Vector2i(6, 5),
+			Vector2i(3, 3), Vector2i(5, 6), Vector2i(5, 3),
+			Vector2i(1, 6), Vector2i(5, 2),
+		],
+		[
+			Vector2i(0, 3), Vector2i(0, 4), Vector2i(3, 0),
+			Vector2i(5, 7), Vector2i(6, 0), Vector2i(7, 7),
 		])

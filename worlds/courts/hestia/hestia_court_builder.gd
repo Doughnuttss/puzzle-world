@@ -43,6 +43,9 @@ const HEARTH_PLATFORM_RAISED_Y := 0.82
 const HEARTH_TABLETS_SUNK_Y := -1.15
 const HEARTH_TABLETS_RAISED_Y := 0.42
 const ALTAR_Z := BACK_Z - ALCOVE_DEPTH * 0.55
+## High enough to read as a reveal, low enough that rising steps stay jump-reachable.
+const ALTAR_RISE_HEIGHT := 1.15
+const ALTAR_SHAFT_HEIGHT := 4.6
 
 
 func _ready() -> void:
@@ -76,6 +79,7 @@ func _build_court() -> void:
 	_build_eternal_flame_altar(Vector3(0.0, 0.0, ALTAR_Z), stone, terracotta, _mat_emissive(Color(1.0, 0.5, 0.15), 1.4))
 	_build_conduit_network(conduit_cold)
 	_build_torches_on_supports(stone_dark)
+	_build_plantations(terracotta, stone_dark)
 
 
 func _mark(node: Node) -> void:
@@ -309,11 +313,13 @@ func _build_guardian_statue(
 	if inward.dot(alcove_center - mid) < 0.0:
 		inward = -inward
 
-	# ~arch height (ARCH_OPENING_H); stand clear of the diagonal wall.
+	# Slightly taller than the side arches; stand clear of the diagonal wall.
+	const STATUE_SCALE := 1.22
 	var root := Node3D.new()
 	root.name = statue_name
-	root.position = mid + inward * 1.35
+	root.position = mid + inward * 1.45
 	root.position.y = 0.0
+	root.scale = Vector3.ONE * STATUE_SCALE
 	# Face the central hearth — same forward sense as the Expert panels (+Z into the court).
 	var to_hearth := HEARTH_CENTER - root.position
 	to_hearth.y = 0.0
@@ -970,48 +976,71 @@ func _build_pillar(pos: Vector3, puzzle_id: String, stone: Material, panel_mat: 
 
 
 func _build_eternal_flame_altar(pos: Vector3, stone: Material, trim: Material, flame_mat: Material) -> void:
-	## Expert zone: central altar on the dais; 1.12 / 1.13 mounted on the back wall.
-	var root := StaticBody3D.new()
+	## Expert zone: whole podium rises on a deep shaft (never floats); portal opens in the altar middle after rise.
+	var root := Node3D.new()
 	root.name = "EternalFlameAltar"
-	root.collision_layer = 1
-	root.collision_mask = 0
 	root.position = pos
 
-	# Approach steps toward the hall (+Z).
+	var rising := StaticBody3D.new()
+	rising.name = "AltarRising"
+	rising.collision_layer = 1
+	rising.collision_mask = 0
+	rising.position = Vector3.ZERO
+	rising.set_meta("sunk_y", 0.0)
+	rising.set_meta("raised_y", ALTAR_RISE_HEIGHT)
+
+	# Deep stone shaft under the whole footprint so the raised altar stays grounded.
+	var shaft := MeshInstance3D.new()
+	shaft.name = "AltarShaft"
+	var shaft_mesh := BoxMesh.new()
+	shaft_mesh.size = Vector3(3.4, ALTAR_SHAFT_HEIGHT, 3.2)
+	shaft.mesh = shaft_mesh
+	shaft.material_override = stone
+	# Top flush with altar underside; body extends deep below the floor.
+	shaft.position = Vector3(0.0, 0.42 - ALTAR_SHAFT_HEIGHT * 0.5, 0.35)
+	rising.add_child(shaft)
+	var shaft_shape := CollisionShape3D.new()
+	var shaft_box := BoxShape3D.new()
+	shaft_box.size = shaft_mesh.size
+	shaft_shape.shape = shaft_box
+	shaft_shape.position = shaft.position
+	rising.add_child(shaft_shape)
+
+	# Approach steps toward the hall (+Z) — rise with the altar so the portal stays reachable.
 	for i in 3:
 		var step := MeshInstance3D.new()
 		var step_mesh := BoxMesh.new()
-		var w := 4.2 - float(i) * 0.55
-		var d := 1.35 - float(i) * 0.12
+		var w := 4.0 - float(i) * 0.5
+		var d := 1.2 - float(i) * 0.1
 		step_mesh.size = Vector3(w, 0.28, d)
 		step.mesh = step_mesh
 		step.material_override = stone
-		step.position = Vector3(0.0, 0.14 + float(i) * 0.28, 1.55 - float(i) * 0.35)
-		root.add_child(step)
+		step.position = Vector3(0.0, 0.14 + float(i) * 0.28, 1.65 - float(i) * 0.32)
+		rising.add_child(step)
 		var step_shape := CollisionShape3D.new()
 		var step_box := BoxShape3D.new()
 		step_box.size = step_mesh.size
 		step_shape.shape = step_box
 		step_shape.position = step.position
-		root.add_child(step_shape)
+		rising.add_child(step_shape)
 
-	# Central altar block — no puzzle panels attached.
 	var altar := MeshInstance3D.new()
+	altar.name = "AltarTop"
 	var altar_mesh := BoxMesh.new()
-	altar_mesh.size = Vector3(2.2, 1.05, 1.45)
+	altar_mesh.size = Vector3(2.35, 1.05, 1.55)
 	altar.mesh = altar_mesh
 	altar.material_override = trim
 	altar.position = Vector3(0.0, 0.95, -0.15)
-	root.add_child(altar)
+	rising.add_child(altar)
 	var altar_shape := CollisionShape3D.new()
 	var altar_box := BoxShape3D.new()
 	altar_box.size = altar_mesh.size
 	altar_shape.shape = altar_box
 	altar_shape.position = altar.position
-	root.add_child(altar_shape)
+	rising.add_child(altar_shape)
 
-	# Shallow bowl recess on top.
 	var bowl := MeshInstance3D.new()
+	bowl.name = "AltarBowl"
 	var bowl_mesh := CylinderMesh.new()
 	bowl_mesh.top_radius = 0.42
 	bowl_mesh.bottom_radius = 0.48
@@ -1019,7 +1048,7 @@ func _build_eternal_flame_altar(pos: Vector3, stone: Material, trim: Material, f
 	bowl.mesh = bowl_mesh
 	bowl.material_override = _mat_stone(Color(0.22, 0.18, 0.14), 0.8)
 	bowl.position = Vector3(0.0, 1.55, -0.15)
-	root.add_child(bowl)
+	rising.add_child(bowl)
 
 	var flame := MeshInstance3D.new()
 	flame.name = "AltarFlame"
@@ -1030,7 +1059,7 @@ func _build_eternal_flame_altar(pos: Vector3, stone: Material, trim: Material, f
 	flame.mesh = flame_mesh
 	flame.material_override = flame_mat
 	flame.position = Vector3(0.0, 1.95, -0.15)
-	root.add_child(flame)
+	rising.add_child(flame)
 
 	var light := OmniLight3D.new()
 	light.name = "AltarLight"
@@ -1038,20 +1067,99 @@ func _build_eternal_flame_altar(pos: Vector3, stone: Material, trim: Material, f
 	light.light_energy = 0.6
 	light.omni_range = 12.0
 	light.position = Vector3(0.0, 2.4, -0.15)
-	root.add_child(light)
+	rising.add_child(light)
 
 	var label := Label3D.new()
+	label.name = "AltarLabel"
 	label.text = "1.12–1.13 Eternal Flame"
 	label.font_size = 32
 	label.pixel_size = 0.008
 	label.position = Vector3(0.0, 3.35, -0.15)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	root.add_child(label)
+	rising.add_child(label)
 
+	_build_altar_hub_portal(rising)
+
+	root.add_child(rising)
 	_mark(root)
 
 	# Expert panels mounted on the flat back wall (left / right), facing into the alcove.
 	_build_expert_back_wall_panels(stone)
+
+
+func _build_altar_hub_portal(rising: Node3D) -> void:
+	## Portal sits in the altar middle; inactive until the rise finishes.
+	var portal := Area3D.new()
+	portal.name = "AltarHubPortal"
+	portal.collision_layer = 4
+	portal.collision_mask = 2
+	portal.monitoring = false
+	portal.monitorable = false
+	# Centered on the altar top (same XZ as the bowl/flame).
+	portal.position = Vector3(0.0, 1.48, -0.15)
+	portal.set_script(load("res://systems/portal.gd"))
+	portal.set("destination_scene_id", "hub")
+	portal.set("destination_spawn_id", "from_hestia")
+	portal.set("require_unlocked", false)
+	portal.set("open_prompt", "Return to Hub")
+	portal.set("locked_prompt", "Sealed")
+	portal.set("auto_enter", true)
+	portal.visible = false
+	portal.set_meta("portal_ready", false)
+
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1.55, 2.2, 0.85)
+	shape.shape = box
+	shape.position = Vector3(0.0, 1.05, 0.15)
+	portal.add_child(shape)
+
+	var frame_mat := _mat_stone(Color(0.45, 0.22, 0.12), 0.7, 0.15)
+	for side in [-1, 1]:
+		var post := MeshInstance3D.new()
+		var post_mesh := BoxMesh.new()
+		post_mesh.size = Vector3(0.18, 2.2, 0.28)
+		post.mesh = post_mesh
+		post.material_override = frame_mat
+		post.position = Vector3(float(side) * 0.78, 1.05, 0.1)
+		portal.add_child(post)
+
+	var lintel := MeshInstance3D.new()
+	var lintel_mesh := BoxMesh.new()
+	lintel_mesh.size = Vector3(1.75, 0.2, 0.28)
+	lintel.mesh = lintel_mesh
+	lintel.material_override = frame_mat
+	lintel.position = Vector3(0.0, 2.2, 0.1)
+	portal.add_child(lintel)
+
+	var gate := MeshInstance3D.new()
+	gate.name = "PortalGate"
+	var gate_mesh := BoxMesh.new()
+	gate_mesh.size = Vector3(1.35, 1.95, 0.12)
+	gate.mesh = gate_mesh
+	var gate_mat := StandardMaterial3D.new()
+	gate_mat.albedo_color = Color(1.0, 0.55, 0.2, 0.5)
+	gate_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	gate_mat.emission_enabled = true
+	gate_mat.emission = Color(1.0, 0.45, 0.12)
+	gate_mat.emission_energy_multiplier = 0.0
+	gate_mat.roughness = 0.25
+	gate.material_override = gate_mat
+	gate.position = Vector3(0.0, 1.05, 0.1)
+	gate.scale = Vector3(0.05, 0.05, 0.05)
+	portal.add_child(gate)
+
+	var label := Label3D.new()
+	label.name = "Label3D"
+	label.text = "Return to Hub"
+	label.font_size = 28
+	label.pixel_size = 0.009
+	label.position = Vector3(0.0, 2.55, 0.25)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.visible = false
+	portal.add_child(label)
+
+	rising.add_child(portal)
 
 
 func _build_expert_back_wall_panels(stone: Material) -> void:
@@ -1219,6 +1327,110 @@ func _build_torches_on_supports(stone_dark: Material) -> void:
 				light.add_to_group("hestia_torch_light")
 				light.set_meta("advanced_id", puzzle_id)
 				_mark(light)
+
+
+func _build_plantations(terracotta: Material, _stone_dark: Material) -> void:
+	## Urns along each side wall: between Advanced arches, altar-corner, and arc-side gap.
+	var leaf := _mat_stone(Color(0.28, 0.42, 0.22), 0.92)
+	var leaf_deep := _mat_stone(Color(0.18, 0.32, 0.16), 0.95)
+	var leaf_warm := _mat_stone(Color(0.38, 0.48, 0.2), 0.9)
+	var soil := _mat_stone(Color(0.22, 0.16, 0.1), 0.98)
+
+	var mid_z: float = (ARCH_REAR_Z + ARCH_OUTER_Z) * 0.5
+	# Corner between the rear Advanced support pillar and the altar alcove mouth.
+	var altar_corner_z: float = (_arch_flank_support_z(ARCH_REAR_Z, -1) + BACK_Z) * 0.5
+	# Gap between the outer Advanced support pillar and the half-circle rim.
+	var arc_gap_z: float = (_arch_flank_support_z(ARCH_OUTER_Z, 1) + ARC_CENTER.z) * 0.5
+	var slots: Array[float] = [altar_corner_z, mid_z, arc_gap_z]
+	var slot_names := ["Altar", "Mid", "Arc"]
+
+	var root := Node3D.new()
+	root.name = "Plantations"
+	for side: int in [-1, 1]:
+		var wall_x := _wall_room_face_x(side) - float(side) * 0.55
+		for i in slots.size():
+			var plant := _make_planter(terracotta, leaf, leaf_deep, leaf_warm, soil, 1.1)
+			plant.name = "Planter_%s_%s" % [("L" if side < 0 else "R"), slot_names[i]]
+			plant.position = Vector3(wall_x, 0.0, slots[i])
+			plant.rotation.y = float(side) * 0.12
+			root.add_child(plant)
+	_mark(root)
+
+
+func _make_planter(
+	terracotta: Material,
+	leaf: Material,
+	leaf_deep: Material,
+	leaf_warm: Material,
+	soil: Material,
+	scale_mul: float
+) -> Node3D:
+	var root := Node3D.new()
+	root.scale = Vector3.ONE * scale_mul
+	_add_pot(root, terracotta, 0.42, 0.55, 0.62, 0.0)
+	_add_soil_disk(root, soil, 0.38, 0.58)
+	_add_foliage_clump(root, leaf, leaf_deep, Vector3(0.0, 0.95, 0.0), 0.55, 0.7)
+	_add_foliage_clump(root, leaf_warm, leaf, Vector3(0.18, 1.15, 0.1), 0.32, 0.45)
+	return root
+
+
+func _add_pot(parent: Node3D, mat: Material, bottom_r: float, top_r: float, height: float, y: float) -> void:
+	var pot := MeshInstance3D.new()
+	var pot_mesh := CylinderMesh.new()
+	pot_mesh.bottom_radius = bottom_r
+	pot_mesh.top_radius = top_r
+	pot_mesh.height = height
+	pot.mesh = pot_mesh
+	pot.material_override = mat
+	pot.position = Vector3(0.0, y + height * 0.5, 0.0)
+	parent.add_child(pot)
+	var lip := MeshInstance3D.new()
+	var lip_mesh := CylinderMesh.new()
+	lip_mesh.bottom_radius = top_r * 1.08
+	lip_mesh.top_radius = top_r * 1.12
+	lip_mesh.height = 0.06
+	lip.mesh = lip_mesh
+	lip.material_override = mat
+	lip.position = Vector3(0.0, y + height + 0.02, 0.0)
+	parent.add_child(lip)
+
+
+func _add_soil_disk(parent: Node3D, mat: Material, radius: float, y: float) -> void:
+	var soil := MeshInstance3D.new()
+	var disk := CylinderMesh.new()
+	disk.top_radius = radius
+	disk.bottom_radius = radius
+	disk.height = 0.05
+	soil.mesh = disk
+	soil.material_override = mat
+	soil.position = Vector3(0.0, y, 0.0)
+	parent.add_child(soil)
+
+
+func _add_foliage_clump(
+	parent: Node3D,
+	mat_a: Material,
+	mat_b: Material,
+	pos: Vector3,
+	radius: float,
+	height: float
+) -> void:
+	var canopy := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = radius
+	sphere.height = height
+	canopy.mesh = sphere
+	canopy.material_override = mat_a
+	canopy.position = pos
+	parent.add_child(canopy)
+	var puff := MeshInstance3D.new()
+	var puff_mesh := SphereMesh.new()
+	puff_mesh.radius = radius * 0.62
+	puff_mesh.height = height * 0.7
+	puff.mesh = puff_mesh
+	puff.material_override = mat_b
+	puff.position = pos + Vector3(radius * 0.35, height * 0.12, -radius * 0.2)
+	parent.add_child(puff)
 
 
 func _defs_for(puzzle_id: String) -> LineTraceDefs:
