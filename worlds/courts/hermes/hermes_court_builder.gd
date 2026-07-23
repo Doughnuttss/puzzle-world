@@ -2,7 +2,10 @@ extends Node3D
 
 ## Procedural greybox for Hermes — The Cloud Bridge.
 ## Five floating marble discs (central plaza + four diagonal islands) over a cloud void.
-## Puzzles / Galewind totems are deferred — geometry + travel only.
+## Zone 1 hosts a stick + anamorph sandwich prototype; other zones deferred.
+
+const HermesAnamorphStationScript := preload("res://worlds/courts/hermes/hermes_anamorph_station.gd")
+const HermesPuzzleDataScript := preload("res://worlds/courts/hermes/hermes_puzzle_data.gd")
 
 const ZONE5_RADIUS := 8.5
 const OUTER_RADIUS := 5.0
@@ -210,11 +213,355 @@ func _build_zone_disc(
 	marker.set_meta("hermes_zone_id", zone_id)
 	root.add_child(marker)
 
+	if zone_id == 1:
+		_build_zone1_anamorph_station(root, marble, gold)
+
 	_mark(root)
 
 
+func _build_zone1_anamorph_station(zone_root: Node3D, marble: Material, gold: Material) -> void:
+	## Side view: rim → short vertical post → thin inward-tilted panel → small stick.
+	var inward := Vector3(-zone_root.position.x, 0.0, -zone_root.position.z)
+	if inward.length_squared() < 0.001:
+		inward = Vector3(0.0, 0.0, -1.0)
+	else:
+		inward = inward.normalized()
+	var outward := -inward
+
+	var station := Node3D.new()
+	station.name = "Zone1AnamorphStation"
+	## On the true outer rim (Zone 1 is diagonal — not parent +Z).
+	station.position = outward * OUTER_RADIUS
+	## Local -Z toward plaza, +Z out toward the puzzle.
+	station.basis = Basis.looking_at(-inward, Vector3.UP)
+	zone_root.add_child(station)
+
+	var console := StaticBody3D.new()
+	console.name = "ControlStation"
+	console.collision_layer = 1
+	console.collision_mask = 0
+	station.add_child(console)
+
+	## Taller slim solid-color cylinder rising from the border.
+	const POST_R := 0.07
+	const POST_H := 0.78
+	const POST_Z := 0.1
+	var post_mat := StandardMaterial3D.new()
+	post_mat.albedo_color = Color(0.72, 0.48, 0.16)
+	post_mat.roughness = 0.88
+	post_mat.metallic = 0.0
+	var post := MeshInstance3D.new()
+	post.name = "StationPost"
+	var post_mesh := CylinderMesh.new()
+	post_mesh.top_radius = POST_R
+	post_mesh.bottom_radius = POST_R * 1.05
+	post_mesh.height = POST_H
+	post.mesh = post_mesh
+	post.material_override = post_mat
+	post.position = Vector3(0.0, POST_H * 0.5, POST_Z)
+	console.add_child(post)
+
+	var post_shape := CollisionShape3D.new()
+	var post_cyl := CylinderShape3D.new()
+	post_cyl.radius = POST_R * 1.1
+	post_cyl.height = POST_H
+	post_shape.shape = post_cyl
+	post_shape.position = post.position
+	console.add_child(post_shape)
+
+	## Thin panel, tipped slightly toward the plaza (inward).
+	const PANEL_W := 0.85
+	const PANEL_D := 0.55
+	const PANEL_H := 0.055
+	const PANEL_TILT_DEG := 12.0
+	var panel_pivot := Node3D.new()
+	panel_pivot.name = "PanelPivot"
+	panel_pivot.position = Vector3(0.0, POST_H, POST_Z)
+	## Positive X rotation tips the far edge down / near edge up → faces inward/up a bit.
+	panel_pivot.rotation_degrees = Vector3(PANEL_TILT_DEG, 0.0, 0.0)
+	console.add_child(panel_pivot)
+
+	var desk := MeshInstance3D.new()
+	desk.name = "StationPanel"
+	var desk_mesh := BoxMesh.new()
+	desk_mesh.size = Vector3(PANEL_W, PANEL_H, PANEL_D)
+	desk.mesh = desk_mesh
+	desk.material_override = marble
+	desk.position = Vector3(0.0, PANEL_H * 0.5, PANEL_D * 0.15)
+	panel_pivot.add_child(desk)
+
+	var desk_shape := CollisionShape3D.new()
+	var desk_box := BoxShape3D.new()
+	desk_box.size = Vector3(PANEL_W, PANEL_H, PANEL_D)
+	desk_shape.shape = desk_box
+	desk_shape.position = desk.position
+	panel_pivot.add_child(desk_shape)
+
+	## Compact contrast-colored stick (teal bronze — reads against gold/marble).
+	var stick_mat := StandardMaterial3D.new()
+	stick_mat.albedo_color = Color(0.12, 0.42, 0.48)
+	stick_mat.roughness = 0.45
+	stick_mat.metallic = 0.35
+
+	var stick := HermesAnamorphStationScript.new()
+	stick.name = "ControlStick"
+	stick.position = Vector3(0.0, PANEL_H, PANEL_D * 0.15)
+	panel_pivot.add_child(stick)
+
+	var stick_mesh := MeshInstance3D.new()
+	stick_mesh.name = "StickMesh"
+	var shaft := CylinderMesh.new()
+	shaft.top_radius = 0.028
+	shaft.bottom_radius = 0.034
+	shaft.height = 0.38
+	stick_mesh.mesh = shaft
+	stick_mesh.material_override = stick_mat
+	stick_mesh.position = Vector3(0.0, 0.22, 0.0)
+	stick.add_child(stick_mesh)
+
+	var knob := MeshInstance3D.new()
+	var knob_mesh := SphereMesh.new()
+	knob_mesh.radius = 0.048
+	knob_mesh.height = 0.096
+	knob.mesh = knob_mesh
+	knob.material_override = stick_mat
+	knob.position = Vector3(0.0, 0.44, 0.0)
+	stick.add_child(knob)
+
+	var stick_shape := CollisionShape3D.new()
+	var stick_box := BoxShape3D.new()
+	stick_box.size = Vector3(0.35, 0.55, 0.35)
+	stick_shape.shape = stick_box
+	stick_shape.position = Vector3(0.0, 0.28, 0.0)
+	stick.add_child(stick_shape)
+
+	var hint := Label3D.new()
+	hint.name = "StationHint"
+	hint.text = "Rim station · face the sky board"
+	hint.font_size = 18
+	hint.pixel_size = 0.007
+	hint.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	hint.position = Vector3(0.0, 1.55, POST_Z)
+	hint.modulate = Color(0.95, 0.88, 0.65)
+	station.add_child(hint)
+
+	_build_zone1_sky_constellation(zone_root.position, stick, marble)
+
+
+func _build_zone1_sky_constellation(zone_pos: Vector3, stick: Node, marble: Material) -> void:
+	## Sky board far ahead/above; locked cam looks up at ~45°.
+	const PANEL_SIZE := 6.5
+	const VIEW_DIST := 34.0
+	## 45° elevation: equal rise and run from camera to board center.
+	var elev := deg_to_rad(45.0)
+	var cam_local := Vector3(0.0, -VIEW_DIST * sin(elev), -VIEW_DIST * cos(elev))
+
+	## Float the constellation deep into the sky beyond Zone 1.
+	var outward := zone_pos
+	outward.y = 0.0
+	if outward.length_squared() < 0.001:
+		outward = Vector3(0.0, 0.0, 1.0)
+	else:
+		outward = outward.normalized()
+
+	var sky := Node3D.new()
+	sky.name = "Zone1SkyConstellation"
+	sky.position = zone_pos + Vector3(0.0, 26.0, 0.0) + outward * 22.0
+	sky.add_to_group("hermes_sky_constellation")
+	## Face the approach (toward plaza / stick) so the 45° view reads naturally.
+	var to_plaza := -outward
+	sky.basis = Basis.looking_at(to_plaza, Vector3.UP)
+	_mark(sky)
+
+	var panel_mat := StandardMaterial3D.new()
+	panel_mat.albedo_color = Color(0.72, 0.7, 0.66, 0.0)
+	panel_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	panel_mat.roughness = 0.9
+
+	var panel := LineTracePanel.new()
+	panel.name = "Zone1CompositePanel"
+	## Local -Z faces the camera (Basis.looking_at points -Z at the cam).
+	panel.setup(
+		HermesPuzzleDataScript.make_z1_intro(),
+		Vector3(PANEL_SIZE, PANEL_SIZE, 0.08),
+		Vector3(0.0, 0.0, -1.0),
+		panel_mat
+	)
+	panel.external_start_only = true
+	panel.open_prompt = "Use the control stick"
+	panel.position = Vector3.ZERO
+	## Orient panel so its face looks down the 45° view toward the solve cam.
+	panel.basis = Basis.looking_at(cam_local.normalized(), Vector3.UP)
+	panel.set_solid_enabled(false)
+	sky.add_child(panel)
+	## Ink plane sits on the logical board; path uses no-depth-test so it reads on top of tiles.
+	_hide_composite_panel_mesh(panel)
+
+	var mount := Node3D.new()
+	mount.name = "ScatterMount"
+	mount.position = Vector3.ZERO
+	mount.set_meta("anamorph_truth_rotation", Vector3.ZERO)
+	sky.add_child(mount)
+
+	var solve_anchor := Marker3D.new()
+	solve_anchor.name = "SolveCamAnchor"
+	solve_anchor.position = cam_local
+	solve_anchor.basis = Basis.looking_at(-cam_local, Vector3.UP)
+	sky.add_child(solve_anchor)
+
+	_spawn_sky_fragments(panel, mount, cam_local, PANEL_SIZE, marble)
+
+	mount.set_meta("anamorph_panel_id", panel.puzzle_id)
+	## Slightly stronger start offset so the first view reads more broken.
+	mount.rotation_degrees = Vector3(22.0, -34.0, 0.0)
+
+	if stick.has_method("configure"):
+		stick.call("configure", panel, mount, solve_anchor)
+
+	var sky_label := Label3D.new()
+	sky_label.name = "SkyLabel"
+	sky_label.text = "Wind Sight"
+	sky_label.font_size = 48
+	sky_label.pixel_size = 0.028
+	sky_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sky_label.position = Vector3(0.0, PANEL_SIZE * 0.65, 0.0)
+	sky_label.modulate = Color(0.9, 0.85, 0.65, 0.85)
+	sky.add_child(sky_label)
+
+
+func _hide_composite_panel_mesh(panel: LineTracePanel) -> void:
+	var mesh := panel.get_node_or_null("PanelMesh")
+	if mesh is MeshInstance3D:
+		(mesh as MeshInstance3D).visible = false
+	for child in panel.get_children():
+		if child is Label3D:
+			(child as Label3D).visible = false
+	var grid := panel.get_node_or_null("GridVisual")
+	if grid is Node3D:
+		(grid as Node3D).visible = false
+		## Keep ink coplanar with the board face — offsetting toward the camera
+		## breaks perspective and makes the path miss the fused tiles.
+		(grid as Node3D).position = panel.face_normal * 0.04
+	panel.set_meta("anamorph_composite", true)
+
+
+func _spawn_sky_fragments(
+	panel: LineTracePanel,
+	mount: Node3D,
+	cam_local: Vector3,
+	panel_size: float,
+	marble: Material
+) -> void:
+	## Strong anamorph: chips stay on solve-cam rays (so they fuse at truth) but with
+	## scrambled depths, stretch, and twist so off-angles look sheared — not a neat lattice.
+	var defs: LineTraceDefs = panel.defs
+	if defs == null:
+		return
+	var gw: int = maxi(1, defs.grid_w)
+	var gh: int = maxi(1, defs.grid_h)
+	## Match LineTracePanel axes for face_normal (0,0,-1): u = -X, v = +Y.
+	var face := Vector3(0.0, 0.0, -1.0)
+	var u_axis := Vector3(-1.0, 0.0, 0.0)
+	var v_axis := Vector3(0.0, 1.0, 0.0)
+	var half := panel_size * 0.5
+	var thickness := 0.08
+	var face_lift := face * (thickness * 0.5 + 0.02)
+	var cell_w := (panel_size * 0.92) / float(gw)
+	var cell_h := (panel_size * 0.92) / float(gh)
+
+	var base_col := Color(0.78, 0.76, 0.72)
+	if marble is StandardMaterial3D:
+		base_col = (marble as StandardMaterial3D).albedo_color
+
+	var frag_root := Node3D.new()
+	frag_root.name = "Fragments"
+	mount.add_child(frag_root)
+
+	## Panel may be rotated in sky space — express cell centers in sky/mount space.
+	var panel_xf := panel.transform
+
+	for y in gh:
+		for x in gw:
+			var cell := Vector2i(x, y)
+			var u := ((float(x) + 0.5) / float(gw)) * 2.0 - 1.0
+			var v := 1.0 - ((float(y) + 0.5) / float(gh)) * 2.0
+			var on_panel_local: Vector3 = u_axis * (u * half * 0.92) + v_axis * (v * half * 0.92) + face_lift
+			var on_panel: Vector3 = panel_xf * on_panel_local
+			var dir := (on_panel - cam_local)
+			var dist := dir.length()
+			if dist < 0.001:
+				continue
+			dir /= dist
+
+			## Deterministic scramble (not row-ordered) so neighbors don't form neat depth bands.
+			var scramble := fposmod(float(x * 7 + y * 13) * 0.618034, 1.0)
+			var scramble2 := fposmod(float(x * 3 + y * 11) * 0.381966, 1.0)
+			## Wide depth range: near-cam → past the board plane.
+			var depth := lerpf(dist * 0.26, dist * 1.18, scramble)
+			var frag_pos := cam_local + dir * depth
+			var scale := depth / dist
+
+			## Mild per-tile stretch (heavy stretch breaks the fused board silhouette).
+			var stretch_u := lerpf(0.82, 1.22, scramble)
+			var stretch_v := lerpf(0.82, 1.22, scramble2)
+			var twist := lerpf(-0.4, 0.4, fposmod(scramble + scramble2, 1.0))
+
+			var frag := MeshInstance3D.new()
+			frag.name = "Frag_%d_%d" % [x, y]
+			var box := BoxMesh.new()
+			box.size = Vector3(
+				cell_w * scale * 0.88 * stretch_u,
+				cell_h * scale * 0.88 * stretch_v,
+				maxf(0.1, 0.16 * scale)
+			)
+			frag.mesh = box
+			frag.position = frag_pos
+			var face_basis := Basis.looking_at(cam_local - frag_pos, Vector3.UP)
+			frag.basis = face_basis.rotated(face_basis.z.normalized(), twist)
+
+			var mat := StandardMaterial3D.new()
+			var col := base_col
+			if defs.is_black(cell) or defs.is_blocked(cell):
+				col = Color(0.14, 0.11, 0.09)
+			elif defs.is_start(cell):
+				col = Color(1.0, 0.82, 0.25)
+			elif defs.is_exit(cell):
+				col = Color(0.35, 0.85, 1.0)
+			elif (x + y) % 2 == 0:
+				col = base_col.darkened(0.12)
+			else:
+				col = base_col.lightened(0.05)
+			mat.albedo_color = col
+			mat.roughness = 0.82
+			if defs.is_start(cell) or defs.is_exit(cell):
+				mat.emission_enabled = true
+				mat.emission = col
+				mat.emission_energy_multiplier = 1.4
+			frag.material_override = mat
+			frag_root.add_child(frag)
+
+			## Orange coal gem on black pieces (visible on the dark tile).
+			if defs.is_black(cell):
+				var coal := MeshInstance3D.new()
+				coal.name = "CoalGem"
+				var coal_box := BoxMesh.new()
+				var gem := mini(cell_w, cell_h) * scale * 0.34
+				coal_box.size = Vector3(gem, gem, maxf(0.06, 0.1 * scale))
+				coal.mesh = coal_box
+				## Frag -Z faces the camera after looking_at.
+				coal.position = Vector3(0.0, 0.0, -maxf(0.05, 0.08 * scale))
+				var coal_mat := StandardMaterial3D.new()
+				coal_mat.albedo_color = Color(1.0, 0.42, 0.08)
+				coal_mat.emission_enabled = true
+				coal_mat.emission = Color(1.0, 0.4, 0.08)
+				coal_mat.emission_energy_multiplier = 2.2
+				coal_mat.roughness = 0.35
+				coal.material_override = coal_mat
+				frag.add_child(coal)
+
+
 func _zone_rail_gap_yaws(zone_id: int, is_center: bool, pos: Vector3) -> Array[float]:
-	## Yaws (rad) where bridges meet the disc — leave open so you can walk on/off.
+	## Yaws (rad) where bridges / stations meet the disc — leave open so you can walk on/off.
 	var gaps: Array[float] = []
 	if is_center:
 		gaps.append(0.0) # spawn / north

@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://systems/world_bootstrap.gd" id="1_boot"]
 [ext_resource type="Script" path="res://systems/spawn_point.gd" id="2_spawn"]
 [ext_resource type="Script" path="res://worlds/courts/hermes/hermes.gd" id="3_court"]
 [ext_resource type="Script" path="res://worlds/courts/hermes/hermes_court_builder.gd" id="4_builder"]
+[ext_resource type="Script" path="res://worlds/courts/hermes/hermes_court_controller.gd" id="5_ctrl"]
 
 [sub_resource type="Environment" id="Environment_hermes"]
 background_mode = 1
@@ -44,6 +45,9 @@ shadow_enabled = false
 [node name="CourtBuilder" type="Node3D" parent="."]
 script = ExtResource("4_builder")
 
+[node name="CourtController" type="Node" parent="."]
+script = ExtResource("5_ctrl")
+
 [node name="Title" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.5, 22)
 pixel_size = 0.018
@@ -58,7 +62,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.7, 22)
 pixel_size = 0.009
 billboard = 1
 modulate = Color(0.95, 0.9, 0.7, 1)
-text = "Sky temple greybox · five zones · puzzles coming soon · stele returns to hub"
+text = "Zone 1 stick · look up · WASD fuse sky pieces · mouse draws"
 font_size = 22
 outline_size = 5
 horizontal_alignment = 1

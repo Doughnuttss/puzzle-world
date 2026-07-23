@@ -289,12 +289,42 @@ func reset_progress() -> void:
 	print("[DEV] Progress reset — only Hestia unlocked.")
 
 
+## Hestia expert IDs — used by the debug clear-court cheat.
+const DEV_HESTIA_PUZZLES: Array[String] = [
+	"1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7",
+	"1.8", "1.9", "1.10", "1.11", "1.12", "1.13",
+]
+
+
+func dev_complete_court(zone_id: String = "") -> void:
+	## Debug-only: mark the court cleared, unlock the next gate, reload so portals update.
+	if not OS.is_debug_build():
+		return
+	var z := zone_id
+	if z.is_empty():
+		z = current_zone_id
+	if z == ZONE_HUB or z.is_empty():
+		## From the hub, skip the Hestia grind so Hermes is reachable immediately.
+		z = "hestia"
+	if z == "hestia":
+		for pid in DEV_HESTIA_PUZZLES:
+			mark_puzzle_solved(z, pid)
+	elif z == "hermes":
+		mark_puzzle_solved(z, "z1.1")
+	complete_zone(z)
+	print("[DEV] Completed court '%s' — next gate unlocked." % z)
+	get_tree().reload_current_scene()
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	# Dev-only: Ctrl+Shift+R wipes save and reloads the current scene.
+	# Dev-only hotkeys (debug builds / editor).
 	if not OS.is_debug_build():
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_R and event.ctrl_pressed and event.shift_pressed:
 			reset_progress()
 			get_tree().reload_current_scene()
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_C and not event.ctrl_pressed and not event.alt_pressed:
+			dev_complete_court()
 			get_viewport().set_input_as_handled()

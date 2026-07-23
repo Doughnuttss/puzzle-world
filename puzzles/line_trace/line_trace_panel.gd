@@ -18,6 +18,8 @@ var is_unlocked: bool = true
 var is_solved: bool = false
 var face_normal: Vector3 = Vector3(0, 0, 1)
 var keep_player_camera: bool = false
+## When true, E on the panel does nothing — a stick / station starts the session.
+var external_start_only: bool = false
 var _solved_path: Array[Vector2i] = []
 
 var _mesh: MeshInstance3D
@@ -188,6 +190,23 @@ func mark_solved(silent: bool = false) -> void:
 		puzzle_solved.emit(puzzle_id)
 
 
+func solidify_anamorph_display() -> void:
+	## After clear: collapse the depth-scatter illusion into one real coplanar board
+	## so walking around no longer shows floating ink + debris.
+	if not has_meta("anamorph_composite"):
+		return
+	remove_meta("anamorph_composite")
+	set_meta("anamorph_solidified", true)
+	if _mesh:
+		_mesh.visible = true
+	if _label:
+		_label.visible = true
+	if _grid_root:
+		_grid_root.visible = true
+		_grid_root.position = face_normal * (_thickness() * 0.5 + 0.02)
+	_refresh_visual()
+
+
 func set_solved_path(path: Array[Vector2i]) -> void:
 	_solved_path = path.duplicate()
 	if is_solved:
@@ -207,11 +226,13 @@ func get_prompt() -> String:
 
 
 func can_interact(_player: Node) -> bool:
+	if external_start_only:
+		return false
 	return is_unlocked and not is_solved
 
 
 func interact(player: Node) -> void:
-	if is_solved or not is_unlocked or defs == null:
+	if external_start_only or is_solved or not is_unlocked or defs == null:
 		return
 	var session := _find_or_make_session(player)
 	if session == null or session.is_active():
@@ -219,6 +240,18 @@ func interact(player: Node) -> void:
 	if not session.solved.is_connected(_on_session_solved):
 		session.solved.connect(_on_session_solved)
 	session.open_on_panel(self, player)
+
+
+func begin_session_from_external(player: Node) -> LineTraceSession:
+	## Used by Hermes control sticks (and similar) that own the interact prompt.
+	if is_solved or not is_unlocked or defs == null:
+		return null
+	var session := _find_or_make_session(player)
+	if session == null or session.is_active():
+		return null
+	if not session.solved.is_connected(_on_session_solved):
+		session.solved.connect(_on_session_solved)
+	return session
 
 
 func prepare_for_session() -> void:
@@ -301,23 +334,26 @@ func _rebuild_grid_visual() -> void:
 	if not is_unlocked:
 		return
 
+	var path_only := has_meta("anamorph_composite")
 	var gw: int = maxi(1, defs.grid_w)
 	var gh: int = maxi(1, defs.grid_h)
 	var cell_wu := maxf(0.05, (_face_half_u * 1.84) / float(gw))
 	var cell_hv := maxf(0.05, (_face_half_v * 1.84) / float(gh))
 	var gap := mini(0.05, mini(cell_wu, cell_hv) * 0.18)
-	var marker_r := clampf(mini(cell_wu, cell_hv) * 0.32, 0.04, 0.35)
+	var marker_r := clampf(mini(cell_wu, cell_hv) * 0.32, 0.04, 0.55)
 
-	for y in gh:
-		for x in gw:
-			var cell := Vector2i(x, y)
-			var center := _cell_center_local(cell)
-			var col := Color(0.38, 0.34, 0.30)
-			if defs.is_black(cell) or defs.is_blocked(cell):
-				col = Color(0.12, 0.10, 0.09)
-			elif (x + y) % 2 == 0:
-				col = Color(0.44, 0.40, 0.36)
-			_add_face_chip(center, maxf(0.04, cell_wu - gap), maxf(0.04, cell_hv - gap), col, 0.012, 0.01)
+	## Hermes sky anamorph: tiles are the scatter meshes — never draw the back grid.
+	if not path_only:
+		for y in gh:
+			for x in gw:
+				var cell := Vector2i(x, y)
+				var center := _cell_center_local(cell)
+				var col := Color(0.38, 0.34, 0.30)
+				if defs.is_black(cell) or defs.is_blocked(cell):
+					col = Color(0.12, 0.10, 0.09)
+				elif (x + y) % 2 == 0:
+					col = Color(0.44, 0.40, 0.36)
+				_add_face_chip(center, maxf(0.04, cell_wu - gap), maxf(0.04, cell_hv - gap), col, 0.012, 0.01)
 
 	if _logic != null and not is_solved and _logic.path.size() >= 2:
 		for i in range(_logic.path.size() - 1):
@@ -336,15 +372,19 @@ func _rebuild_grid_visual() -> void:
 				_add_path_segment(a2, b2, Color(1.0, 0.42, 0.12))
 			for cell in _solved_path:
 				_add_marker_chip(_cell_center_local(cell), marker_r * 0.4, Color(1.0, 0.5, 0.15), 0.035)
-		var occupied := LineTraceValidator.path_occupied(_solved_path)
-		for piece in defs.black_pieces:
-			var captured := _solved_path.is_empty() or LineTraceValidator.is_captured(piece, occupied, defs)
-			var c := Color(0.35, 0.95, 0.45) if captured else Color(0.55, 0.28, 0.1)
-			_add_marker_chip(_cell_center_local(piece), marker_r * 0.65, c, 0.05)
-		for s in defs.starts:
-			_add_marker_chip(_cell_center_local(s), marker_r * 0.85, Color(1.0, 0.78, 0.2), 0.055)
-		for e in defs.exits:
-			_add_exit_marker(_cell_center_local(e), marker_r * 0.9, Color(0.45, 0.85, 1.0))
+		if not path_only:
+			var occupied := LineTraceValidator.path_occupied(_solved_path)
+			for piece in defs.black_pieces:
+				var captured := _solved_path.is_empty() or LineTraceValidator.is_captured(piece, occupied, defs)
+				var c := Color(0.35, 0.95, 0.45) if captured else Color(0.55, 0.28, 0.1)
+				_add_marker_chip(_cell_center_local(piece), marker_r * 0.65, c, 0.05)
+			for s in defs.starts:
+				_add_marker_chip(_cell_center_local(s), marker_r * 0.85, Color(1.0, 0.78, 0.2), 0.055)
+			for e in defs.exits:
+				_add_exit_marker(_cell_center_local(e), marker_r * 0.9, Color(0.45, 0.85, 1.0))
+		return
+
+	if path_only:
 		return
 
 	var occupied_live: Dictionary = {}
@@ -401,6 +441,10 @@ func _add_marker_chip(center: Vector3, radius: float, color: Color, lift: float)
 	mat.emission_energy_multiplier = 1.8
 	mat.roughness = 0.35
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if has_meta("anamorph_composite"):
+		## Draw on top of sky tiles without moving off the board plane (keeps UV alignment).
+		mat.no_depth_test = true
+		mat.render_priority = 10
 	mi.material_override = mat
 	mi.position = center + face_normal * maxf(0.03, lift)
 	_grid_root.add_child(mi)
@@ -443,22 +487,26 @@ func _add_path_segment(a: Vector3, b: Vector3, color: Color) -> void:
 		return
 	var mi := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	# Thin rod along the longest world axis of the segment (axis-aligned panels).
-	var abs_d := delta.abs()
 	var thickness := 0.08
-	if abs_d.x >= abs_d.y and abs_d.x >= abs_d.z:
-		box.size = Vector3(length, thickness, thickness)
-	elif abs_d.y >= abs_d.z:
-		box.size = Vector3(thickness, length, thickness)
+	if has_meta("anamorph_composite"):
+		thickness = maxf(0.12, mini(_face_half_u, _face_half_v) * 0.08)
+	## Orient the rod in face space (u/v), not raw XYZ — panel may be tilted in the sky.
+	var along_u := absf(delta.dot(_u_axis))
+	var along_v := absf(delta.dot(_v_axis))
+	if along_u >= along_v:
+		box.size = _face_aligned_size(length, thickness, thickness)
 	else:
-		box.size = Vector3(thickness, thickness, length)
+		box.size = _face_aligned_size(thickness, length, thickness)
 	mi.mesh = box
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.emission_enabled = true
 	mat.emission = color
-	mat.emission_energy_multiplier = 1.4
+	mat.emission_energy_multiplier = 1.6
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if has_meta("anamorph_composite"):
+		mat.no_depth_test = true
+		mat.render_priority = 10
 	mi.material_override = mat
 	mi.position = mid + face_normal * 0.045
 	_grid_root.add_child(mi)
